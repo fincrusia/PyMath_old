@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 class Node:
     cursor = -1
@@ -221,7 +221,7 @@ class Node:
     def is_term(self):
         if self.is_variable():
             return True
-        elif self.type.is_function():
+        elif self.is_function():
             for child in self.children:
                 if not child.is_term():
                     return False
@@ -406,10 +406,10 @@ class Node:
 
         new_function = Function(name)
 
-        exist_bound = exist_bound.substitute(exist_variable, new_function.copy()(all_variables))
-        exist_sentence = exist_sentence.substitute(exist_variable, new_function.copy()(all_variables))
+        exist_bound = exist_bound.substitute(exist_variable, new_function.copy()(*all_variables))
+        exist_sentence = exist_sentence.substitute(exist_variable, new_function.copy()(*all_variables))
 
-        for index in range(number_of_all, -1, -1):
+        for index in range(number_of_all - 1, -1, -1):
             exist_bound = _All(all_variables[index], all_bounds[index], exist_bound)
             exist_sentence = _All(all_variables[index], all_bounds[index], exist_bound)
 
@@ -596,10 +596,26 @@ definition_of_pairing, pairing = pairing.say("pairing")
 def Pairing(a, b):
     return Node("function", "pairing", [A.copy(), B.copy()], {})
 
+def OrderedPair(a, b):
+    return Pairing(a, Pairing(a, b))
 
+def Tuple(*arguments):
+    if len(arguments) == 0:
+        return Variable("0_uple")
+    elif len(arguments) == 1:
+        return arguments[0].copy()
+    else:
+        result = arguments[0].copy()
+        for argument in arguments[1 :]:
+            result = OrderedPair(result, argument.copy())
+        return result
 
-
-
+# membership
+E = Variable("E")
+membership = Exist(E, true, All(x, set_(x), y, set_(y), (Tuple(x, y) @ E) // (x @ y)))
+membership.prove_CAUTION()
+membership_class, _ , membership = membership.let("membership")
+membership_class = membership_class()
 
 # start
 # TODO
