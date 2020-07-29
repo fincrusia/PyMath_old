@@ -140,13 +140,23 @@ class Node:
     
     # operators
     def __or__(self, A):
-        return Node("logical", "or", [self.copy(), A.copy()], {})
+        if self.is_sentence():
+            return Node("logical", "or", [self.copy(), A.copy()], {})
+        elif self.is_term():
+            return Node("function", "pairing", [self.copy(), A.copy()], {"binary" : "cup"})
+        else:
+            assert False
 
     def __and__(self, A):
-        return Node("logical", "and", [self.copy(), A.copy()], {})
+        if self.is_sentence():
+            return Node("logical", "and", [self.copy(), A.copy()], {})
+        elif self.is_term():
+            return Node("function", "intersection", [self.copy(), A.copy()], {"binary" : "cup"})
+        else:
+            assert False
 
-    def __neq__(self, A):
-        return Node("logical", "not", [self.copy(), A.copy()], {})
+    def __invert__(self):
+        return Node("logical", "not", [self.copy()], {})
 
     def __rshift__(self, A):
         return Node("logical", "imply", [self.copy(), A.copy()], {})
@@ -161,7 +171,7 @@ class Node:
         return Node("property", "inclusion", [self.copy(), A.copy()], {})
 
     def __matmul__(self, A):
-        return Node("property", "in", [self.copy(), A.copy()], {})
+        return Node("property", "in", [self.copy(), A.copy()], {"binary" : "in"})
 
     def __call__(self, *arguments):
         for argument in arguments:
@@ -411,7 +421,7 @@ class Node:
 
         for index in range(number_of_all - 1, -1, -1):
             exist_bound = _All(all_variables[index], all_bounds[index], exist_bound)
-            exist_sentence = _All(all_variables[index], all_bounds[index], exist_bound)
+            exist_sentence = _All(all_variables[index], all_bounds[index], exist_sentence)
 
         exist_bound.prove_CAUTION()
         exist_sentence.prove_CAUTION()
@@ -553,6 +563,7 @@ def False_():
 # ... and so on
 
 
+
 # axioms
 verbose(True)
 
@@ -594,7 +605,7 @@ pairing.export("pairing")
 definition_of_pairing, pairing = pairing.say("pairing")
 
 def Pairing(a, b):
-    return Node("function", "pairing", [A.copy(), B.copy()], {})
+    return Node("function", "pairing", [a.copy(), b.copy()], {"binary" : "cup"})
 
 def OrderedPair(a, b):
     return Pairing(a, Pairing(a, b))
@@ -615,7 +626,51 @@ E = Variable("E")
 membership = Exist(E, true, All(x, set_(x), y, set_(y), (Tuple(x, y) @ E) // (x @ y)))
 membership.prove_CAUTION()
 membership_class, _ , membership = membership.let("membership")
-membership_class = membership_class()
+membership.export("membership")
+
+# intersection
+intersection = All(A, true, B, true, Exist(C, true, All(x, set_(x), (x @ C) // ((x @ A) and (x @ B)))))
+intersection.prove_CAUTION()
+intersection_function, _, intersection = intersection.let("intersection")
+intersection_function.set_("binary", "cap")
+intersection.export("intersection")
+
+def Intersection(A, B):
+    return Node("function", "intersection", [A.copy(), B.copy()], {"binary" : "cap"})
+
+# complement
+complement = All(A, true, Exist(B, true, All(x, set_(x), ((x @ B) // ~(x @ A)))))
+complement.prove_CAUTION()
+complement_function, _, complement = complement.let("complement")
+complement.export("complement")
+
+# domain
+domain = All(A, true, Exist(B, true, All(x, set_(x), ((x @ B) // (Exist(y, set_(y), Tuple(x, y) @ A))))))
+domain.prove_CAUTION()
+domain_function, _, domain = domain.let("domain")
+domain.export("domain")
+
+# product by V
+u = Variable("u")
+product_by_V = All(A, true, Exist(B, true, All(u, set_(u), ((u @ B) // (Exist(x, set_(x), y, set_(y), (u == Tuple(x, y)) & (x @ A)))))))
+product_by_V.prove_CAUTION()
+product_by_V_function, _, product_by_V = product_by_V.let("product_by_V")
+product_by_V.export("product_by_V")
+
+# circular permutation
+circular_permutation = All(A, true, Exist(B, true, All(x, set_(x), y, set_(y), z, set_(z), ((Tuple(x, y, z) @ B) // (Tuple(y, z, x) @ A)))))
+circular_permutation.prove_CAUTION()
+circular_permutation_function, _, circular_permutation = circular_permutation.let("circular_permutation")
+circular_permutation.export("circular_permutation")
+
+# transposition
+transposition = All(A, true, Exist(B, true, All(x, set_(x), y, set_(y), z, set_(z), ((Tuple(x, y, z) @ B) // (Tuple(x, z, y) @ A)))))
+transposition.prove_CAUTION()
+transposition_function, _, transposition = transposition.let("transposition")
+transposition.export("transposition")
+
+
+
 
 # start
 # TODO
