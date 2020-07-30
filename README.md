@@ -10,7 +10,7 @@ Purpose on easy proof-writing and automatic verification.
 
 # Basic Concepts
 
-## Node and Branches
+## Nodes and Branches
 
 In **PyMath**, everything including sentences and terms are implemented as trees, using class **Node**.
 
