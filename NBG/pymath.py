@@ -35,7 +35,7 @@ class Node:
     def copy(self):
         children = [child.copy() for child in self.children]
         node = Node(self.type, self.name, children, self.attributes)
-        if self.branch:
+        if self.branch != None:
             node.branch = [x for x in self.branch]
         else:
             node.branch = None
@@ -84,7 +84,7 @@ class Node:
             else:
                 assert False
         elif self.is_quantifier():
-            return ("(" + self.name + "(" + str(self[0]) + "," + str(self[1]) + "," + str(self[2]) + "))")
+            return (self.name + "(" + str(self[0]) + "," + str(self[1]) + "," + str(self[2]) + ")")
         elif self.is_property() or self.is_function():
             if self["unary"]:
                 assert len(self.children) == 1
@@ -93,15 +93,17 @@ class Node:
                 assert len(self.children) == 2
                 return ("(" + str(self[0]) + " " + self["binary"] + " " + str(self[1]) + ")")
             else:
-                result = ("(" + self.name + "(")
+                result = (self.name + "(")
                 for index, child in enumerate(self.children):
                     result += str(child)
                     if index != len(self.children) - 1:
                         result += ","
-                result += "))"
+                result += ")"
                 return result
         elif self.is_variable():
             return self.name
+        else:
+            assert False
 
     def _repr(self, IDs):
         if self.is_variable():
@@ -109,15 +111,14 @@ class Node:
                 IDs[self.name] = len(IDs) + 1
             return ("#" + str(IDs[self.name]))
         else:
-            result = "(" + self.name + "("
+            result = (self.name + "(")
             for child in self.children:
-                result += (str(child) + ",")
-            result += "))"
+                result += (repr(child) + ",")
+            result += ")"
             return result
 
     def __repr__(self):
-        result, _ = self._repr({})
-        return result
+        return self._repr({})
 
 
     # assumptions
@@ -131,11 +132,14 @@ class Node:
             Node.branch[Node.cursor] += 1
             Node.assumptions[Node.cursor] = self.copy()
             Node.non_generalizables[Node.cursor] = self.get_free_names()
-        return self.copy()
+        node = self.copy()
+        node.prove_CAUTION()
+        return node
 
     def __exit__(self, *arguments):
         Node.last = (Node.assumptions[Node.cursor].copy() >> Node.last.copy())
         Node.cursor -= 1
+        Node.last.prove_CAUTION()
 
     
     # operators
@@ -156,7 +160,12 @@ class Node:
             assert False
 
     def __invert__(self):
-        return Node("logical", "not", [self.copy()], {})
+        if self.is_sentence():
+            return Node("logical", "not", [self.copy()], {})
+        elif self.is_term():
+            return Node("function", "complement", [self.copy()], {})
+        else:
+            assert False
 
     def __rshift__(self, A):
         return Node("logical", "imply", [self.copy(), A.copy()], {})
@@ -312,7 +321,7 @@ class Node:
             assert False # for readability
         else:
             children = [child._contract(term, variable, free_names) for child in self.children]
-            return Node(self.name(), self.type, children, self.attributes)
+            return Node(self.type, self.name, children, self.attributes)
 
     def contract(self, term, variable):
         assert term.is_term()
@@ -322,12 +331,15 @@ class Node:
 
     def logical_decomposition(self, atomics):
         if self.is_logical():
-            children = [child._logical_decomposition(atomics) for child in self.children]
+            children = []
+            for child in self.children:
+                child_decomposition, atomics = child.logical_decomposition(atomics)
+                children.append(child_decomposition)
             return Node(self.type, self.name, children, {}), atomics
         else:
             for key, atomic in atomics.items():
                 if self.compare(atomic):
-                    return Node("atomic", key, [], {})
+                    return Node("atomic", key, [], {}), atomics
             atomics[len(atomics)] = self.copy()
             return Node("atomic", len(atomics) - 1, [], {}), atomics
 
@@ -377,15 +389,13 @@ class Node:
 
         assert bound_put.compare(bound)
 
-        result = _All(variable, bound_put, sentence_put)
-        result.prove_CAUTION()
-        return result
+        sentence_put.prove_CAUTION()
+        return sentence_put
 
     def found(self, term, bound, name):
         assert self.is_proved()
         assert term.is_term()
         assert bound.is_proved()
-        assert not name in Node.names
 
         variable = Variable(name)
         bound_found = bound.contract(term, variable)
@@ -494,11 +504,12 @@ class Node:
                 if prefix and key[:len(prefix)] != prefix:
                     continue
                 try:
-                    function(self.copy(), *reasons)
-                    if self.is_proved():
-                        return self
+                    node = function(self.copy(), *reasons)
+                    if node.is_proved() and self.compare(node):
+                        return node
                 except:
-                    pass
+                    continue
+            assert False
 
 
 
@@ -529,7 +540,7 @@ def All(*arguments):
     assert len(arguments) >= 3
     assert len(arguments) % 2 == 1
     node = sentence
-    for index in range(0, len(arguments) - 1, 2):
+    for index in reversed(range(0, len(arguments) - 1, 2)):
         node = _All(arguments[index], arguments[index + 1], node)
     return node
 
@@ -541,7 +552,7 @@ def Exist(*arguments):
     assert len(arguments) >= 3
     assert len(arguments) % 2 == 1
     node = sentence
-    for index in range(0, len(arguments) - 1, 2):
+    for index in reversed(range(0, len(arguments) - 1, 2)):
         node = _Exist(arguments[index], arguments[index + 1], node)
     return node
 
@@ -572,6 +583,11 @@ true = True_()
 true.logic()
 true.export("true")
 
+# false
+false = False_()
+not_false = (~false).logic()
+not_false.export("not_false")
+
 # axiom scheme of equality
 def equal(A_is_B, reason):
     assert reason.is_proved()
@@ -580,7 +596,8 @@ def equal(A_is_B, reason):
     B = A_is_B[1]
     assert A.equal(B, reason)
     A_is_B.prove()
-remember("equal", equal)
+
+remember("booting::equal:1", equal)
 
 # set
 x = Variable("x")
@@ -588,12 +605,33 @@ C = Variable("C")
 definition_of_set, set_ = Exist(C, True_(), x @ C).say("set")
 definition_of_set.export("set")
 
+def is_set(target, source): # x in C => set_(x)
+    x = source[0]
+    C = source[1]
+    P1 = Node.theorems["set"].put(x, true)
+    P2 = source.found(C, true, "C")
+    return set_(x).logic(P1, P2)
+
+remember("booting::set::1", is_set)
+
+
 # axiom of extensionality
 A = Variable("A")
 B = Variable("B")
 extensionality = All(A, True_(), B, True_(), (All(x, set_(x), ((x @ A) // (x @ B))) >> (A == B)))
 extensionality.prove_CAUTION()
 extensionality.export("extensionality")
+
+def uniqueness_from_extensionality(A, B, e, condition):
+    with All(e, set_(e), (e @ A) // condition) as Ap:
+        with All(e, set_(e), (e @ B) // condition) as Bp:
+            x = Variable("x")
+            P1 = ((x @ A) // (x @ B)).logic(Ap.put(x), Bp.put(x))
+            P1 = P1.gen(x, set_(x))
+            P2 = (A == B).logic(Node.theorems["extensionality"].put(A).put(B), P1)
+        P2 = Node.last.copy()
+    P2 = Node.last.copy()
+    return P2
 
 # axiom of pairing
 y = Variable("y")
@@ -629,20 +667,103 @@ membership_class, _ , membership = membership.let("membership")
 membership.export("membership")
 
 # intersection
-intersection = All(A, true, B, true, Exist(C, true, All(x, set_(x), (x @ C) // ((x @ A) and (x @ B)))))
+intersection = All(A, true, B, true, Exist(C, true, All(x, set_(x), (x @ C) // ((x @ A) & (x @ B)))))
 intersection.prove_CAUTION()
 intersection_function, _, intersection = intersection.let("intersection")
 intersection_function.set_("binary", "cap")
 intersection.export("intersection")
 
-def Intersection(A, B):
+def cap(A, B):
     return Node("function", "intersection", [A.copy(), B.copy()], {"binary" : "cap"})
+
+def cap_law_1(target, source): # x in A cap B => x in A
+    x = source[0]
+    A = source[1][0]
+    B = source[1][1]
+    P = set_(x).by(source)
+    return target.logic(Node.theorems["intersection"].put(A, true).put(B, true).put(x, P), source)
+
+remember("booting::cap::1", cap_law_1)
+    
+def cap_law_2(target, source): # x in A cap B => x in B
+    x = source[0]
+    A = source[1][0]
+    B = source[1][0]
+    P = set_(x).by(source)
+    return target.logic(Node.theorems["intersection"].put(A, true).put(B, true).put(x, P), source)
+
+remember("booting::cap::2", cap_law_2)
+
+def cap_law_3(target, source_A, source_B): # x in A, x in B => x in A cap B
+    x = source_A[0]
+    A = source_A[1]
+    B = source_B[1]
+    P = set_(x).by(source_A)
+    return target.logic(Node.theorems["intersection"].put(A, true).put(B, true).put(x, P), source_A, source_B)
+
+remember("booting::cap::3", cap_law_3)
+
+def cap_law_4(target, source_B, source_A): # x in B, x in A => x in A cap B
+    x = source_A[0]
+    A = source_A[1]
+    B = source_B[1]
+    P = set_(x).by(source_A)
+    return target.logic(Node.theorems["intersection"].put(A, true).put(B, true).put(x, P), source_A, source_B)
+
+remember("booting::cap::4", cap_law_4)
 
 # complement
 complement = All(A, true, Exist(B, true, All(x, set_(x), ((x @ B) // ~(x @ A)))))
 complement.prove_CAUTION()
 complement_function, _, complement = complement.let("complement")
+complement_function.set_("unary", "~")
 complement.export("complement")
+
+def complement_law_1(target, source): # x in A => ~(x in ~A)
+    x = source[0]
+    A = source[1]
+    P = set_(x).by(source)
+    return target.logic(Node.theorems["complement"].put(A, true).put(x, P), source)
+
+remember("booting::complement::1", complement_law_1)
+
+def complement_law_2(target, source): # x in ~A => ~(x in A)
+    x = source[0]
+    A = source[1][0]
+    P = set_(x).by(source)
+    return target.logic(Node.theorems["complement"].put(A, true).put(x, P), source)
+
+remember("booting::complement::2", complement_law_2)
+
+def complement_law_3(target, source): # ~(x in A) => x in ~A
+    x = source[0][0]
+    A = source[0][1]
+    P = set_(x).by(source)
+    return target.logic(Node.theorems["complement"].put(A, true).put(x, P), source)
+
+remember("booting::complement::3", complement_law_3)
+
+def complement_law_4(target, source): # ~(x in ~A) => x in A
+    x = source[0][0]
+    A = source[0][0][1]
+    P = set_(x).by(source)
+    return target.logic(Node.theorems["complement"].put(A, true).put(x, P), source)
+
+remember("booting::complement::4", complement_law_4)
+
+
+empty = membership_class & (~membership_class)
+alpha = Variable("alpha")
+with (alpha @ empty) as P:
+    alpha_in_E = (alpha @ membership_class).by(P)
+    alpha_not_in_E = (~(alpha @ membership_class)).by((alpha @ ~membership_class).by(P))
+    contradiction = false.logic(alpha_in_E, alpha_not_in_E)
+empty_has_no_elements = (~(alpha @ empty)).logic(Node.last)
+empty_has_no_elements = empty_has_no_elements.gen(alpha, set_(alpha))
+empty_has_no_elements = empty_has_no_elements.found(empty, true, "x")
+empty_class, _, empty = empty_has_no_elements.let("empty")
+empty.export("empty")
+
 
 # domain
 domain = All(A, true, Exist(B, true, All(x, set_(x), ((x @ B) // (Exist(y, set_(y), Tuple(x, y) @ A))))))
