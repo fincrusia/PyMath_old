@@ -4,7 +4,7 @@ PyMath
 
 # Purpose
 
-To build mathematical theorys on Python.
+To build mathematical theories on Python.
 
 Purpose on easy proof-writing and automatic verification.
 
