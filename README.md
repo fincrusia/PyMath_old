@@ -42,7 +42,7 @@ For example, the following code generates a variable named *"x"*:
 
     S = (P >> Q)
 
-
+You can overload operators in many ways using member of *attributes* of the *Node* class.
 
 
 ## Fitch-style Proof
@@ -51,7 +51,8 @@ To assume a sentence (P >> Q), and shorten it as A, write:
 
     with (P >> Q) as A:
         ... # some proof to deduce B
-        B
+        B # proved
+
     result = Node.last.copy() # this gives (A >> B), proved
 
 A static member *"Node.last"* always points the lastly proved sentence.
@@ -68,7 +69,7 @@ Of course, you can use nested assumptions:
 
 
 
-## Propositional deductions
+## Propositional Deductions
 
 When you got sentences *A*, *B*, *C*, which tautologically deduce *D*, just type:
 
@@ -78,6 +79,70 @@ Then D is proved.
 
 
 ## Deductions with Quantifiers
+
+To substitute an "all"-variable by a term, use *"put()"* method.
+
+Conversely, *"gen()"* method generalizes a sentence with given "all"-variable.
+
+If a term satisfies a property so you want to assert the existence of such object, use *"found()"* method.
+
+You can use *"let()"* method to define a function(or a constant) from the existence sentence.
+
+Similarly, *"say()"* method defines a property from any sentence.
+
+
+
+## Auto-Deduction
+
+One of the key-features of PyMath is the auto-deduction.
+
+Basically it is not a sort of AI, proving something you didn't prove.
+
+But since we are working on the Python, you can freely add functions generating proofs.
+
+These "meta-theorems" can be added to *"Node.memory"*.
+
+When you call the *"by()"* method, PyMath brutally applies all the meta-theorems to the given reasons.
+
+    def meta_theorem(target, reason_1, reason_2, ...):
+        ...
+        # generate proof
+        # do not need to worry for exceptions, since this function will called in the try-except sense.
+
+    remember("name_of_the_theorem", meta_theorem)  # "cache" the function
+
+    target.by(reason_1, reason_2, ...)  # this would prove the target
+
+
+Of course, you can also use *"by()"* method inside meta-theorems.
+
+
+
+# Exportations
+
+You can export theorems so that they can be used in the other files:
+
+    A.export("name_of_the_theorem")
+
+    ...
+
+    Node.theorems["name_of_the_theorem"]  # returns the theorem
+
+
+
+# Option: Verbose
+
+If you want to see all the sentence proved, use the method *"verbose()"*:
+
+    ...  # mute
+
+    verbose(True)
+    
+    ...  # prints out everything
+    
+    verbose (False)
+    
+    ...  # mute
 
 
 
