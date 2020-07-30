@@ -46,12 +46,12 @@ Then D is proved.
 
 ## Some Rules
 
-1. Method "prove_CAUTION()" is only for the implementation. **DO NOT** use in your proof.
+### Method "prove_CAUTION()" is only for the implementation. **DO NOT** use in your proof.
 
-2. Each top-level folder is dedicated for one axiomatic system, and the folders **MUST NOT** import each other.
+### Each top-level folder is dedicated for one axiomatic system, and the folders **MUST NOT** import each other.
 
 For instance, a result of the ZF theory should not referred in the ZFC theory. Why? Even ZFC is stronger than ZF, properties and functions in ZF are not guaranteed to have same definitions with their counterparts in ZFC. Probabily the formers are longer, since ZF has fewer tools to define shortly. Hence, ZF and ZFC theories are not "synced" in general.
 
-3. (recommended) Rather than doing same things, use meta-theorems!
+### (Recommended) Rather than doing same things, use meta-theorems!
 
 Making easy-to-use Python methods will contribute to the overall theory. Coding Generic functions might not be easy, but hope we choose the better way for the future.
