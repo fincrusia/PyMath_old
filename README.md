@@ -118,7 +118,7 @@ Of course, you can also use *"by()"* method inside meta-theorems.
 
 
 
-# Exportations
+## Exportations
 
 You can export theorems so that they can be used in the other files:
 
@@ -130,7 +130,7 @@ You can export theorems so that they can be used in the other files:
 
 
 
-# Option: Verbose
+## Option: Verbose
 
 If you want to see all the sentence proved, use the method *"verbose()"*:
 
