@@ -155,7 +155,7 @@ class Node:
         if self.is_sentence():
             return Node("logical", "and", [self.copy(), A.copy()], {})
         elif self.is_term():
-            return Node("function", "intersection", [self.copy(), A.copy()], {"binary" : "cup"})
+            return Node("function", "intersection", [self.copy(), A.copy()], {"binary" : "cap"})
         else:
             assert False
 
@@ -459,6 +459,37 @@ class Node:
         node.prove_CAUTION()
         return node, new_property.copy()
 
+    def bound_to_assumption(self, source):
+        assert self.is_sentence()
+        assert source.is_proved()
+        assert source.is_quantifier()
+        x = source[0]
+        bound = source[1]
+        sentence = source[2]
+
+        assert self.compare(Node("quantifier", source.name, [x, True_(), bound >> sentence], {}))
+        self.prove_CAUTION()
+        return self
+
+    def assumption_to_bound(self, source):
+        assert self.is_sentence()
+        assert source.is_proved()
+        assert source.is_quantifier()
+        x = source[0]
+        bound = source[1]
+        assert source[2].is_logical() and source[2].name == "imply"
+        assumption = source[2][0]
+        sentence = source[2][1]
+
+        new_bound = None
+        if bound.compare(True_()):
+            new_bound = assumption
+        else:
+            new_bound = bound & assumption
+        assert self.compare(Node("quantifier", source.name, [x, new_bound, sentence], {}))
+        self.prove_CAUTION()
+        return self
+
     def logic(self, *reasons):
         for reason in reasons:
             assert reason.is_proved()
@@ -492,26 +523,42 @@ class Node:
         self.prove_CAUTION()
         return self
 
+    marked_names = None
     def by(self, *reasons, **arguments):
+        first_call = False
+        if Node.marked_names == None:
+            first_call = True
+            Node.marked_names = set()
         name = arguments.get("name")
         if name:
+            assert not name in Node.marked_names
+            Node.marked_names.add(name)
             function = Node.memory[name]
-            function(self.copy(), *reasons)
-            return self
+            node = function(self.copy(), *reasons)
+            assert self.compare(node) and node.is_proved()
+            if first_call:
+                Node.marked_names = None
+            else:
+                Node.marked_names.remove(name)
+            return node
         else:
             prefix = arguments.get("prefix")
             for key, function in Node.memory.items():
                 if prefix and key[:len(prefix)] != prefix:
                     continue
+                if key in Node.marked_names:
+                    continue
                 try:
+                    Node.marked_names.add(key)
                     node = function(self.copy(), *reasons)
+                    Node.marked_names.remove(key)
                     if node.is_proved() and self.compare(node):
+                        if first_call:
+                            Node.marked_names = None
                         return node
                 except:
                     continue
             assert False
-
-
 
 def remember(name, function):
     Node.memory[name] = function
@@ -587,6 +634,18 @@ true.export("true")
 false = False_()
 not_false = (~false).logic()
 not_false.export("not_false")
+
+
+# bound <=> assumption
+def bound_to_assumption(target, source):
+    return target.bound_to_assumption(source)
+
+remember("booting::bound::1", bound_to_assumption)
+
+def assumption_to_bound(target, source):
+    return target.assumption_to_bound(source)
+
+remember("booting::bound::2", assumption_to_bound)
 
 # axiom scheme of equality
 def equal(A_is_B, reason):
@@ -735,19 +794,17 @@ def complement_law_2(target, source): # x in ~A => ~(x in A)
 
 remember("booting::complement::2", complement_law_2)
 
-def complement_law_3(target, source): # ~(x in A) => x in ~A
+def complement_law_3(target, source, bound): # ~(x in A) & set(x) => x in ~A
     x = source[0][0]
     A = source[0][1]
-    P = set_(x).by(source)
-    return target.logic(Node.theorems["complement"].put(A, true).put(x, P), source)
+    return target.logic(Node.theorems["complement"].put(A, true).put(x, bound), source)
 
 remember("booting::complement::3", complement_law_3)
 
-def complement_law_4(target, source): # ~(x in ~A) => x in A
+def complement_law_4(target, source, bound): # ~(x in ~A) & set(x) => x in A
     x = source[0][0]
     A = source[0][0][1]
-    P = set_(x).by(source)
-    return target.logic(Node.theorems["complement"].put(A, true).put(x, P), source)
+    return target.logic(Node.theorems["complement"].put(A, true).put(x, bound), source)
 
 remember("booting::complement::4", complement_law_4)
 
@@ -755,15 +812,24 @@ remember("booting::complement::4", complement_law_4)
 empty = membership_class & (~membership_class)
 alpha = Variable("alpha")
 with (alpha @ empty) as P:
-    alpha_in_E = (alpha @ membership_class).by(P)
+    alpha_in_E = (alpha @ membership_class).by(P, )
     alpha_not_in_E = (~(alpha @ membership_class)).by((alpha @ ~membership_class).by(P))
     contradiction = false.logic(alpha_in_E, alpha_not_in_E)
-empty_has_no_elements = (~(alpha @ empty)).logic(Node.last)
-empty_has_no_elements = empty_has_no_elements.gen(alpha, set_(alpha))
+P = (~(alpha @ empty)).logic(Node.last)
+empty_has_no_elements = P.gen(alpha, set_(alpha))
 empty_has_no_elements = empty_has_no_elements.found(empty, true, "x")
 empty_class, _, empty = empty_has_no_elements.let("empty")
 empty.export("empty")
 
+V = ~empty_class
+with set_(alpha) as P:
+    alpha_in_V = (alpha @ V).by(Node.theorems["empty"].put(alpha, P), P)
+alpha_in_V = Node.last.copy()
+alpha_in_V = alpha_in_V.gen(alpha, true)
+alpha_in_V = (All(alpha, set_(alpha), (alpha @ V))).by(alpha_in_V)
+
+alpha_in_V = alpha_in_V.found(V, true, "V")
+V, _, alpha_in_V = alpha_in_V.let("universe")
 
 # domain
 domain = All(A, true, Exist(B, true, All(x, set_(x), ((x @ B) // (Exist(y, set_(y), Tuple(x, y) @ A))))))
