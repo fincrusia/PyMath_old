@@ -55,8 +55,13 @@ class Node:
                 return False
         return True
 
-    def equal(self, A, reason):
-        assert reason.is_property and len(reason.children) == 2
+    def equal(self, A, *reason):
+        if reason:
+            reason = reason[0]
+            assert reason.is_property and len(reason.children) == 2
+        else:
+            assert self.compare(A)
+            return True
         a = reason.children[0]
         b = reason.children[1]
         if self.compare(A):
@@ -92,6 +97,8 @@ class Node:
             elif self["binary"]:
                 assert len(self.children) == 2
                 return ("(" + str(self[0]) + " " + self["binary"] + " " + str(self[1]) + ")")
+            elif len(self.children) == 0:
+                return self.name
             else:
                 result = (self.name + "(")
                 for index, child in enumerate(self.children):
@@ -101,7 +108,7 @@ class Node:
                 result += ")"
                 return result
         elif self.is_variable():
-            return self.name
+            return self.name[:-5]
         else:
             assert False
 
@@ -174,7 +181,7 @@ class Node:
         return Node("logical", "iff", [self.copy(), A.copy()], {})
 
     def __eq__(self, A):
-        return Node("property", "equal", [self.copy(), A.copy()], {})
+        return Node("property", "equal", [self.copy(), A.copy()], {"binary" : "=="})
     
     def __lshift__(self, A):
         return Node("property", "inclusion", [self.copy(), A.copy()], {})
@@ -303,7 +310,7 @@ class Node:
     def _substitute(self, variable, term):
         if self.is_variable and self.name == variable.name:
             return term.copy()
-        elif self.type in Node.quantifiers and self.children[0].ID == variable.ID:
+        elif self.is_quantifier() and self.children[0].name in term.get_free_names():
             assert False # for readability
         else:
             children = [child._substitute(variable, term) for child in self.children]
@@ -365,6 +372,16 @@ class Node:
             else:
                 assert False
 
+    def get_exist_variable(self):
+        result = []
+        if self.is_quantifier and self.name == "exist":
+            result.append(self[0].copy())
+        for child in self.children:
+            for exist_variable in child.get_exist_variable():
+                result.append(exist_variable)
+        return result
+
+
     # prove
     def prove_CAUTION(self):
         assert self.is_readable()
@@ -392,20 +409,29 @@ class Node:
         sentence_put.prove_CAUTION()
         return sentence_put
 
-    def found(self, term, bound, name):
-        assert self.is_proved()
+    def _found(self, reason, term, variable):
+        if self.compare(reason):
+            return True
+        elif self.compare(variable) and reason.compare(term):
+            return True
+        else:
+            for index in range(0, len(self.children)):
+                if not self[index]._found(reason[index], term, variable):
+                    return False
+            return True
+
+    def found(self, reason, bound, term):
+        assert self.is_quantifier() and self.name == "exist"
+        assert reason.is_proved()
         assert term.is_term()
         assert bound.is_proved()
+        variable = self[0].copy()
+        assert self[1]._found(bound, term, variable)
+        assert self[2]._found(reason, term, variable)
+        self.prove_CAUTION()
+        return self
 
-        variable = Variable(name)
-        bound_found = bound.contract(term, variable)
-        sentence_found = self.contract(term, variable)
-
-        result = _Exist(variable, bound_found, sentence_found)
-        result.prove_CAUTION()
-        return result
-
-    def let(self, name):
+    def let(self, name, **attributes):
         assert self.is_proved()
         assert not name in Node.names
 
@@ -424,7 +450,7 @@ class Node:
         exist_bound = cursor[1].copy()
         exist_sentence = cursor[2].copy()
 
-        new_function = Function(name)
+        new_function = Function(name, **attributes)
 
         exist_bound = exist_bound.substitute(exist_variable, new_function.copy()(*all_variables))
         exist_sentence = exist_sentence.substitute(exist_variable, new_function.copy()(*all_variables))
@@ -452,7 +478,7 @@ class Node:
         new_property = Property(name)
         free_variables = []
         for free_name in free_names:
-            free_variables.append(Variable(free_name))
+            free_variables.append(Variable_namely(free_name))
         node = (new_property(*free_variables) // self.copy())
         for free_variable in reversed(free_variables):
             node = _All(free_variable, True_(), node)
@@ -574,6 +600,41 @@ def forget_prefix(prefix):
 def verbose(switch):
     Node.verbose = switch
 
+A = None
+B = None
+C = None
+a = None
+b = None
+p = None
+u = None
+x = None
+y = None
+z = None
+alpha = None
+
+def clean_up():
+    global A
+    A = Variable("A")
+    global B
+    B = Variable("B")
+    global C
+    C = Variable("C")
+    global a
+    a = Variable("a")
+    global b
+    b = Variable("b")
+    global p
+    p = Variable("p")
+    global u
+    u = Variable("u")
+    global x
+    x = Variable("x")
+    global y
+    y = Variable("y")
+    global z
+    z = Variable("z")
+    global alpha
+    alpha = Variable("alpha")
 
 # constructors
 def _All(variable, bound, sentence):
@@ -603,7 +664,15 @@ def Exist(*arguments):
         node = _Exist(arguments[index], arguments[index + 1], node)
     return node
 
+ID_counter = 0
 def Variable(name, **attributes):
+    global ID_counter
+    ID_counter += 1
+    return Node("variable", name + ("%05d" % ID_counter), [], attributes)
+
+def Variable_namely(name, **attributes):
+    global ID_counter
+    ID_counter += 1
     return Node("variable", name, [], attributes)
 
 def Function(name, **attributes):
@@ -623,7 +692,6 @@ def False_():
 
 
 # axioms
-verbose(True)
 
 # true
 true = True_()
@@ -648,35 +716,40 @@ def assumption_to_bound(target, source):
 remember("booting::bound::2", assumption_to_bound)
 
 # axiom scheme of equality
-def equal(A_is_B, reason):
-    assert reason.is_proved()
+def equal(A_is_B, *reasons):
+    for reason in reasons:
+        assert reason.is_proved()
     assert A_is_B.is_property() and A_is_B.name == "equal" and len(A_is_B.children) == 2
     A = A_is_B[0]
     B = A_is_B[1]
-    assert A.equal(B, reason)
-    A_is_B.prove()
+    if not reasons:
+        assert A.compare(B)
+    else:
+        assert A.equal(B, reason)
+    A_is_B.prove_CAUTION()
+    return A_is_B
 
-remember("booting::equal:1", equal)
+remember("booting::equal::1", equal)
 
 # set
-x = Variable("x")
-C = Variable("C")
+clean_up()
 definition_of_set, set_ = Exist(C, True_(), x @ C).say("set")
+C_is_set = C.name
 definition_of_set.export("set")
 
 def is_set(target, source): # x in C => set_(x)
     x = source[0]
     C = source[1]
     P1 = Node.theorems["set"].put(x, true)
-    P2 = source.found(C, true, "C")
+    C0 = P1.get_exist_variable()[0]
+    P2 = (Exist(C0, true, x @ C0)).found(source, true, C)
     return set_(x).logic(P1, P2)
 
 remember("booting::set::1", is_set)
 
 
 # axiom of extensionality
-A = Variable("A")
-B = Variable("B")
+clean_up()
 extensionality = All(A, True_(), B, True_(), (All(x, set_(x), ((x @ A) // (x @ B))) >> (A == B)))
 extensionality.prove_CAUTION()
 extensionality.export("extensionality")
@@ -693,19 +766,32 @@ def uniqueness_from_extensionality(A, B, e, condition):
     return P2
 
 # axiom of pairing
-y = Variable("y")
-p = Variable("p")
-z = Variable("z")
+clean_up()
 pairing = All(x, set_(x), y, set_(y), Exist(p, set_(p), All(z, set_(z), (z @ p) // ((z == x) | (z == y)))))
 pairing.prove_CAUTION()
-pairing.export("pairing")
-definition_of_pairing, pairing = pairing.say("pairing")
+pairing.export("axiom_of_pairing")
+pairing, pairing_is_set, definition_of_pairing = pairing.let("pairing", binary = ",")
+definition_of_pairing.export("existence_of_pairing")
+pairing_is_set.export("pairing_is_set")
 
 def Pairing(a, b):
-    return Node("function", "pairing", [a.copy(), b.copy()], {"binary" : "cup"})
+    return Node("function", "pairing", [a.copy(), b.copy()], {"binary" : ","})
 
 def OrderedPair(a, b):
-    return Pairing(a, Pairing(a, b))
+    return Pairing(Pairing(a, b), b)
+
+clean_up()
+with set_(a) as ap:
+    with set_(b) as bp:
+        a_b_is_set = Node.theorems["pairing_is_set"].put(a, ap).put(b, bp)
+        a_b_is_set = Node.theorems["pairing_is_set"].put(Pairing(a, b), a_b_is_set).put(b, bp)
+    a_b_is_set = Node.last.copy()
+    a_b_is_set = a_b_is_set.gen(b, true)
+    a_b_is_set = All(b, set_(b), set_(OrderedPair(a, b))).by(a_b_is_set)
+a_b_is_set = Node.last.copy()
+a_b_is_set = a_b_is_set.gen(a, true)
+a_b_is_set = All(a, set_(a), All(b, set_(b), set_(OrderedPair(a, b)))).by(a_b_is_set)
+a_b_is_set.export("ordered_pairing_is_set")
 
 def Tuple(*arguments):
     if len(arguments) == 0:
@@ -717,6 +803,23 @@ def Tuple(*arguments):
         for argument in arguments[1 :]:
             result = OrderedPair(result, argument.copy())
         return result
+
+def tuple_is_set(target, *arguments):
+    variable_list = []
+    for argument in arguments:
+        variable_list.append(argument[0].copy())
+    node = None
+    sentence = None
+    for index, variable in enumerate(variable_list):
+        if index == 0:
+            sentence = arguments[0]
+            node = variable
+        else:
+            sentence = Node.theorems["ordered_pairing_is_set"].put(node, sentence).put(variable, arguments[index])
+            node = OrderedPair(node, variable)
+    return sentence
+
+remember("booting::tuple::1", tuple_is_set)
 
 # membership
 E = Variable("E")
@@ -808,16 +911,15 @@ def complement_law_4(target, source, bound): # ~(x in ~A) & set(x) => x in A
 
 remember("booting::complement::4", complement_law_4)
 
-
+clean_up()
 empty = membership_class & (~membership_class)
-alpha = Variable("alpha")
 with (alpha @ empty) as P:
-    alpha_in_E = (alpha @ membership_class).by(P, )
+    alpha_in_E = (alpha @ membership_class).by(P)
     alpha_not_in_E = (~(alpha @ membership_class)).by((alpha @ ~membership_class).by(P))
     contradiction = false.logic(alpha_in_E, alpha_not_in_E)
 P = (~(alpha @ empty)).logic(Node.last)
 empty_has_no_elements = P.gen(alpha, set_(alpha))
-empty_has_no_elements = empty_has_no_elements.found(empty, true, "x")
+empty_has_no_elements = (Exist(x, true, All(alpha, set_(alpha), ~(alpha @ x)))).found(empty_has_no_elements, true, empty)
 empty_class, _, empty = empty_has_no_elements.let("empty")
 empty.export("empty")
 
@@ -828,8 +930,9 @@ alpha_in_V = Node.last.copy()
 alpha_in_V = alpha_in_V.gen(alpha, true)
 alpha_in_V = (All(alpha, set_(alpha), (alpha @ V))).by(alpha_in_V)
 
-alpha_in_V = alpha_in_V.found(V, true, "V")
-V, _, alpha_in_V = alpha_in_V.let("universe")
+alpha_in_V = (Exist(C, true, All(alpha, set_(alpha), alpha @ C))).found(alpha_in_V, true, V)
+V, _, alpha_in_V = alpha_in_V.let("universe_V")
+alpha_in_V.export("V_has_everything")
 
 # domain
 domain = All(A, true, Exist(B, true, All(x, set_(x), ((x @ B) // (Exist(y, set_(y), Tuple(x, y) @ A))))))
@@ -855,7 +958,6 @@ transposition = All(A, true, Exist(B, true, All(x, set_(x), y, set_(y), z, set_(
 transposition.prove_CAUTION()
 transposition_function, _, transposition = transposition.let("transposition")
 transposition.export("transposition")
-
 
 
 
