@@ -426,6 +426,7 @@ class Node:
                 Node.found_term = reason.copy()
                 return True
         else:
+            assert len(self.children) == len(reason.children)
             for index in range(0, len(self.children)):
                 if not self[index]._found(reason[index], variable):
                     return False
@@ -621,6 +622,7 @@ B = None
 C = None
 a = None
 b = None
+c = None
 p = None
 u = None
 x = None
@@ -639,6 +641,8 @@ def clean():
     a = Variable("a")
     global b
     b = Variable("b")
+    global c
+    c = Variable("c")
     global p
     p = Variable("p")
     global u
@@ -835,6 +839,22 @@ def finite_set_is_set(target, *arguments):
     return sentence
 
 remember("booting::pairing::1", finite_set_is_set)
+
+
+# x in {a, b} => x == a or x == b
+def expand_pairing(target, source, *bounds):
+    x = source[0]
+    ab = source[1]
+    a = ab[0]
+    b = ab[1]
+    a_s = bounds[0]
+    bs = bounds[1]
+    xs = set_(x).by(source)
+    P = Node.theorems["definition_of_pairing"].put(a, a_s).put(b, bs).put(x, xs)
+    return ((x == a) | (x == b)).logic(source, P)
+
+remember("booting::pairing::4", expand_pairing)
+
 
 def OrderedPair(a, b):
     return Pairing(Pairing(a, b), b)
@@ -1176,6 +1196,7 @@ def has_something_then_not_empty(target, source):
 
 remember("booting::empty::2", has_something_then_not_empty)
 
+
 # x in y and y in x => contradiction
 clean()
 with set_(x) as xs:
@@ -1190,7 +1211,7 @@ with set_(x) as xs:
                 y_in_u = (y @ u).by(xs, ys)
                 xy_is_not_empty = (~(u == empty_class)).by(x_in_u)
                 P3 = P2[1].logic(P2, xy_is_not_empty)
-                kf, kb, kc = P3.let("temp") # to be modified
+                kf, kb, kc = P3.let("no_circular_inclusion_temp") # to be modified
                 P4 = Node.theorems["definition_of_pairing"].put(x, xs).put(y, ys).put(kf, kb)
                 P5 = ((kf == x) | (kf == y)).logic(P4, kc)
                 with kf == x as kx:
@@ -1216,70 +1237,189 @@ P18 = All(x, set_(x), P17[2][1]).by(P17)
 P18.export("no_cyclic_inclusion")
 
 
+# a == b => b == a
+def reflection_of_equality(target, source):
+    a = source[0]
+    b = source[1]
+    bb = (b == b).by()
+    ba = (b == a).by(bb, source)
+    return ba
+
+remember("booting::equal::3", reflection_of_equality)
+
+
+# a != b => b != a
+def reflection_of_nequality(target, source):
+    a = source[0][0]
+    b = source[0][1]
+    with b == a as ba:
+        ab = (a == b).by(ba)
+        false.logic(ab, source)
+    nba = (b != a).logic(Node.last.copy())
+    return nba
+
+remember("booting::equal::4", reflection_of_nequality)
+
 # (a, b) == (x, y) => (a == x and b == y)
-def ordered_pair_compare(target, source, *bounds):
-    ab = source[0]
-    a = ab[0][0]
-    b = ab[0][1]
-    xy = source[1]
-    x = xy[0][0]
-    y = xy[0][1]
-    
-    a_s = bounds[0]
-    bs = bounds[1]
-    xs = bounds[2]
-    ys = bounds[3]
-
-    ab_s = set_(ab).by(a_s, bs)
-    uab = Pairing(a, b)
-    uabs = set_(uab).by(a_s, bs)
-    a_in_abu = (a @ uab).by(a_s, bs)
-    b_in_abu = (b @ uab).by(a_s, bs)
-    uab_in_ab = (uab @ ab).by(uabs, bs)
-    b_in_ab = (b @ ab).by(uabs, bs)
-    
-    xys = set_(xy).by(xs, ys)
-    uxy = Pairing(x, y)
-    uxys = set_(uxy).by(xs, ys)
-    x_in_xyu = (x @ uxy).by(xs, ys)
-    y_in_xyu = (y @ uxy).by(xs, ys)
-    uxy_in_xy = (uxy @ xy).by(uxys, ys)
-    y_in_xy = (y @ xy).by(uxys, ys)
-
-    b_in_xy = (b @ xy).by(b_in_ab, source)
-    y_in_ab = (y @ ab).by(y_in_xy, source)
-
-    P = Node.theorems["definition_of_pairing"].put(uxy, uxys).put(y, ys).put(b, bs)
-    P = ((b == y) | (b == uxy)).logic(P, b_in_xy)
-
-    Q = Node.theorems["definition_of_pairing"].put(uab, uabs).put(b, bs).put(y, ys)
-    Q = ((y == b) | (y == uab)).logic(Q, y_in_ab)
-
-    with b != y as nby:
-        P = (b == uxy).logic(P, nby)
-        with y == b as yb:
-            by = (b == y).by(yb)
-            false.logic(by, nby)
-        nyb = (y != b).logic(Node.last.copy())
-        Q = (y == uab).logic(Q, nyb)
-
-        y_in_b = (y @ b).by(y_in_xyu, P)
-        b_in_y = (b @ y).by(b_in_abu, Q)
-
-        false.logic(y_in_b, b_in_y, Node.theorems["no_cyclic_inclusion"].put(b, bs).put(y, ys))
-    
-    by = (b == y).logic(Node.last.copy())
-
-
-
-
 clean()
-with set_(x) as xs:
-    with set_(y) as ys:
-        with set_(a) as a_s:
-            with set_(b) as bs:
-                with Tuple(a, b) == Tuple(x, y) as ab_xy:
-                    ordered_pair_compare(None, ab_xy, a_s, bs, xs, ys)
+ab = Tuple(a, b)
+xy = Tuple(x, y)
+with set_(a) as a_s:
+    with set_(b) as bs:
+        with set_(x) as xs:
+            with set_(y) as ys:
+                with ab == xy as source:
+                    ab_s = set_(ab).by(a_s, bs)
+                    uab = Pairing(a, b)
+                    uabs = set_(uab).by(a_s, bs)
+                    a_in_uab = (a @ uab).by(a_s, bs)
+                    b_in_uab = (b @ uab).by(a_s, bs)
+                    uab_in_ab = (uab @ ab).by(uabs, bs)
+                    b_in_ab = (b @ ab).by(uabs, bs)
+                    
+                    xys = set_(xy).by(xs, ys)
+                    uxy = Pairing(x, y)
+                    uxys = set_(uxy).by(xs, ys)
+                    x_in_uxy = (x @ uxy).by(xs, ys)
+                    y_in_uxy = (y @ uxy).by(xs, ys)
+                    uxy_in_xy = (uxy @ xy).by(uxys, ys)
+                    y_in_xy = (y @ xy).by(uxys, ys)
+
+                    b_in_xy = (b @ xy).by(b_in_ab, source)
+                    y_in_ab = (y @ ab).by(y_in_xy, source)
+
+                    P = Node.theorems["definition_of_pairing"].put(uxy, uxys).put(y, ys).put(b, bs)
+                    P = ((b == y) | (b == uxy)).logic(P, b_in_xy)
+
+                    Q = Node.theorems["definition_of_pairing"].put(uab, uabs).put(b, bs).put(y, ys)
+                    Q = ((y == b) | (y == uab)).logic(Q, y_in_ab)
+
+                    with b != y as nby:
+                        P = (b == uxy).logic(P, nby)
+                        with y == b as yb:
+                            by = (b == y).by(yb)
+                            false.logic(by, nby)
+                        nyb = (y != b).logic(Node.last.copy())
+                        Q = (y == uab).logic(Q, nyb)
+
+                        y_in_b = (y @ b).by(y_in_uxy, P)
+                        b_in_y = (b @ y).by(b_in_uab, Q)
+
+                        false.logic(y_in_b, b_in_y, Node.theorems["no_cyclic_inclusion"].put(b, bs).put(y, ys))
+                    
+                    by = (b == y).logic(Node.last.copy())
+
+                    with b == uab as b_uab:
+                        b_not_in_b = Node.theorems["no_Quine"].put(b, bs)
+                        b_in_b = (b @ b).by(b_in_uab, b_uab)
+                        false.logic(b_not_in_b, b_in_b)
+                    n_b_uab = (b != uab).logic(Node.last.copy())
+                    
+                    with y == uxy as y_uxy:
+                        y_not_in_y = Node.theorems["no_Quine"].put(y, ys)
+                        y_in_y = (y @ y).by(y_in_uxy, y_uxy)
+                        false.logic(y_not_in_y, y_in_y)
+                    n_y_uxy = (y != uxy).logic(Node.last.copy())
+
+                    uab_in_ab = (uab @ ab).by(uabs, bs)
+                    uab_in_xy = (uab @ xy).by(uab_in_ab, source)
+                    uab_x_or_y = ((uab == uxy) | (uab == y)).by(uab_in_xy, uxys, ys)
+                    n_y_uab = (y != uab).by(n_b_uab, by)
+                    n_uab_y = (uab != y).by(n_y_uab, name = "booting::equal::4")
+
+                    uab_uxy = (uab == uxy).logic(uab_x_or_y, n_uab_y)
+
+                    a_uxy = (a @ uxy).by(a_in_uab, uab_uxy)
+                    ax_or_ay = ((a == x) | (a == y)).by(a_uxy, xs, ys)
+
+                    x_uab = (x @ uab).by(x_in_uxy, uab_uxy)
+                    xa_or_xb = ((x == a) | (x == b)).by(x_uab, a_s, bs)
+
+                    with a != x as nax:
+                        a_y = (a == y).logic(nax, ax_or_ay)
+                        a_b = (a == b).by(a_y, by)
+                        xa_or_xa = ((x == a) | (x == a)).by(xa_or_xb, a_b)
+                        xa = (x == a).logic(xa_or_xa)
+                        ax = (a == x).by(xa)
+                        false.logic(ax, nax)
+                    a_x = (a == x).logic(Node.last.copy())
+
+                    result = ((a == x) & (b == y)).logic(a_x, by)
+                result = Node.last.copy()
+            node = Node.last.copy()[1]
+            result = Node.last.copy().gen(y, true)
+            result = All(y, set_(y), node).by(result)
+        node = Node.last.copy()[1]
+        result = Node.last.copy().gen(x, true)
+        result = All(x, set_(x), node).by(result)
+    node = Node.last.copy()[1]
+    result = Node.last.copy().gen(b, true)
+    result = All(b, set_(b), node).by(result)
+node = Node.last.copy()[1]
+result = Node.last.copy().gen(a, true)
+result = All(a, set_(a), node).by(result)
+result.export("ordered_pairing_compare")
+
+def tuple_compare(target, source, *bounds):
+    arity = len(bounds) // 2
+    
+    variable_list_1 = [bound[0] for bound in bounds[:arity]]
+    variable_list_2 = [bound[0] for bound in bounds[arity:]]
+
+    if arity == 2:
+        P = Node.theorems["ordered_pairing_compare"].put(variable_list_1[0], bounds[0]).put(variable_list_1[1], bounds[1])
+        P = P.put(variable_list_2[0], bounds[2]).put(variable_list_2[1], bounds[3])
+        P = P[1].logic(P, source)
+        return P
+
+    node_list_1 = []
+    node_list_2 = []
+
+    bound_list_1 = []
+    bound_list_2 = []
+
+    node_1 = None
+    node_2 = None
+    for index in range(0, arity):
+        if index == 0:
+            node_1 = variable_list_1[index]
+            node_2 = variable_list_2[index]
+            bound_list_1.append(set_(node_1).by(bounds[index]))
+            bound_list_2.append(set_(node_2).by(bounds[index + arity]))
+        else:
+            _node_1 = OrderedPair(node_1, variable_list_1[index])
+            _node_2 = OrderedPair(node_2, variable_list_2[index])
+
+            bound_list_1.append(set_(_node_1).by(bound_list_1[index - 1], bounds[index]))
+            bound_list_2.append(set_(_node_2).by(bound_list_2[index - 1], bounds[index + arity]))
+ 
+            node_1 = _node_1
+            node_2 = _node_2
+
+
+        node_list_1.append(node_1)
+        node_list_2.append(node_2)
+
+    sentence = source
+    conclusion = None
+    P = Node.theorems["ordered_pairing_compare"]
+    for index in reversed(range(1, arity)):
+        Q = P.put(node_list_1[index - 1], bound_list_1[index - 1]).put(variable_list_1[index], bounds[index])
+        Q = Q.put(node_list_2[index - 1], bound_list_2[index - 1]).put(variable_list_2[index], bounds[index + arity])
+        Q = Q[1].logic(sentence, Q)
+        sentence = Q
+        
+        if index == arity - 1:
+            conclusion = sentence[1].copy().logic(sentence)
+        elif index == 1:
+            conclusion = (conclusion & sentence[1]).logic(conclusion, sentence)
+            conclusion = (conclusion & sentence[0]).logic(conclusion, sentence)
+        else:
+            conclusion = (conclusion & sentence[1]).logic(conclusion, sentence)
+
+    return conclusion
+
+remember("booting::tuple::2", tuple_compare)
 
 
 # tuple lemma
@@ -1289,13 +1429,128 @@ with set_(x) as xs:
         with set_(z) as zs:
             xyz = Tuple(x, y, z)
             xyz_is_set = set_(xyz).by(xs, ys, zs)
+            xy = OrderedPair(x, y)
             P1 = Node.theorems["product_by_V"].put(A, true).put(xyz, xyz_is_set)
-            with xyz @ product_by_V_function(A) as xyz_in_A:
-                x0, y0 = P1.get_exist_variable()
-                P2 = Exist(x0, set_(x0), Exist(y0, set_(y0), ((xyz == Tuple(x0, y0)) & (x0 @ A)))).logic(P1, xyz_in_A)
+            x0, y0 = P1.get_exist_variable()
+            xys = set_(xy).by(xs, ys)
+            with xyz @ product_by_V_function(A) as xyz_in_AV:
+                P2 = Exist(x0, set_(x0), Exist(y0, set_(y0), ((xyz == Tuple(x0, y0)) & (x0 @ A)))).logic(P1, xyz_in_AV)
                 x0_function, x0_bound, sentence = P2.let("tuple_lemma_x0")
                 y0_function, y0_bound, sentence = sentence.let("tuple_lemma_y0")
                 P3 = (xyz == Tuple(x0_function, y0_function)).logic(sentence)
+                xyz_x0y0 = ((xy == x0_function) & (z == y0_function)).by(P3, xys, zs, x0_bound, y0_bound, name = "booting::tuple::2")
+                xy_x0 = xyz_x0y0[0].logic(xyz_x0y0)
+                sentence = sentence[1].copy().logic(sentence)
+                sentence = (xy @ A).by(sentence, xy_x0)
+            P4 = Node.last.copy()
+
+            with xy @ A as xy_in_A:
+                xyz_is_xyz = (xyz == xyz).by()
+                P5 = (xyz_is_xyz & xy_in_A).logic(xyz_is_xyz, xy_in_A)
+                P6 = Exist(y0, set_(y0), (xyz == Tuple(xy, y0)) & (xy @ A)).found(P5, zs)
+                P7 = Exist(x0, set_(x0), Exist(y0, set_(y0), (xyz == Tuple(x0, y0)) & (x0 @ A))).found(P6, xys)
+                P8 = P1[0].copy().logic(P1, P7)
+            P9 = Node.last.copy()
+
+            P10 = (P4[0] // P4[1]).logic(P4, P9)
+        P11 = Node.last.copy().gen(z, true)
+        P12 = All(z, set_(z), P11[2][1]).by(P11)
+    P13 = Node.last.copy().gen(y, true)
+    P14 = All(y, set_(y), P13[2][1]).by(P13)
+P15 = Node.last.copy().gen(x, true)
+P16 = All(x, set_(x), P15[2][1]).by(P15).gen(A, true)
+
+P16.export("tuple_lemma_3")
+
+clean()
+with set_(x) as xs:
+    with set_(y) as ys:
+        with set_(z) as zs:
+            P1 = Node.theorems["tuple_lemma_3"].put(A, true).put(x, xs).put(y, ys).put(z, zs)
+            P2 = Node.theorems["transposition"].put(product_by_V_function(A), true).put(x, xs).put(z, zs).put(y, ys)
+            P3 = (P2[0] // P1[1]).logic(P1, P2)
+        P4 = Node.last.copy().gen(z, true)
+        P5 = All(z, set_(z), P4[2][1]).by(P4)
+    P6 = Node.last.copy().gen(y, true)
+    P7 = All(y, set_(y), P6[2][1]).by(P6)
+P8 = Node.last.copy().gen(x, true)
+P9 = All(x, set_(x), P8[2][1]).by(P8).gen(A, true)
+
+P9.export("tuple_lemma_2")
+
+clean()
+with set_(x) as xs:
+    with set_(y) as ys:
+        with set_(z) as zs:
+            P1 = Node.theorems["tuple_lemma_3"].put(A, true).put(x, xs).put(y, ys).put(z, zs)
+            P2 = Node.theorems["circular_permutation"].put(product_by_V_function(A), true).put(z, zs).put(x, xs).put(y, ys)
+            P3 = (P2[0] // P1[1]).logic(P1, P2)
+        P4 = Node.last.copy().gen(z, true)
+        P5 = All(z, set_(z), P4[2][1]).by(P4)
+    P6 = Node.last.copy().gen(y, true)
+    P7 = All(y, set_(y), P6[2][1]).by(P6)
+P8 = Node.last.copy().gen(x, true)
+P9 = All(x, set_(x), P8[2][1]).by(P8).gen(A, true)
+
+P9.export("tuple_lemma_1")
+
+# added
+clean()
+with set_(x) as xs:
+    with set_(y) as ys:
+        with set_(z) as zs:
+            T = transposition_function(product_by_V_function(A))
+            P1 = Node.theorems["tuple_lemma_2"].put(A, true).put(x, xs).put(y, ys).put(z, zs)
+            P2 = Node.theorems["circular_permutation"].put(T, true).put(y, ys).put(x, xs).put(z, zs)
+            P3 = (P2[0] // P1[1]).logic(P1, P2)
+        P4 = Node.last.copy().gen(z, true)
+        P5 = All(z, set_(z), P4[2][1]).by(P4)
+    P6 = Node.last.copy().gen(y, true)
+    P7 = All(y, set_(y), P6[2][1]).by(P6)
+P8 = Node.last.copy().gen(x, true)
+P9 = All(x, set_(x), P8[2][1]).by(P8).gen(A, true)
+
+P9.export("tuple_lemma_5")
+
+clean()
+with set_(x) as xs:
+    with set_(y) as ys:
+        with set_(z) as zs:
+            yx = Tuple(y, x)
+            yxs = set_(yx).by(ys, xs)
+            xy = Tuple(x, y)
+            xys = set_(xy).by(xs, ys)
+            B = (transposition_function(product_by_V_function(A)))
+            C = circular_permutation_function(B)
+            D = domain_function(C)
+            Q1 = Node.theorems["domain"].put(C, true).put(yx, yxs)
+            with yx @ D as yx_D:
+                Q2 = Q1[1].logic(Q1, yx_D)
+                f, fb, fc = Q2.let("tuple_lemma_temp")
+                P1 = Node.theorems["tuple_lemma_2"].put(A, true).put(x, xs).put(y, ys).put(f, fb)
+                P2 = Node.theorems["circular_permutation"].put(B, true).put(y, ys).put(x, xs).put(f, fb)
+                P3 = (P2[0] // P1[1]).logic(P1, P2)
+                xy_A = (xy @ A).logic(fc, P3)
+            xy_D_to_xy_A = Node.last.copy()
+            with xy @ A as xy_A:
+                CTP = circular_permutation_function(transposition_function(product_by_V_function(A)))
+                Q3 = Node.theorems["tuple_lemma_5"].put(A, true).put(x, xs).put(y, ys).put(z, zs)
+                y0 = Q1.get_exist_variable()[0]
+                Q6 = Q3[0].logic(Q3, xy_A)
+                Q4 = Exist(y0, set_(y0), Tuple(y, x, y0) @ CTP).found(Q6, zs)
+                Q5 = Q1[0].logic(Q1, Q4)
+            xy_A_to_xy_D = Node.last.copy()
+            conclusion = ((yx @ D) // (xy @ A)).logic(xy_D_to_xy_A, xy_A_to_xy_D)
+        P4 = Node.last.copy().gen(z, true)
+        P5 = All(z, set_(z), P4[2][1]).by(P4)
+    P6 = Node.last.copy().gen(y, true)
+    P7 = All(y, set_(y), P6[2][1]).by(P6)
+P8 = Node.last.copy().gen(x, true)
+P9 = All(x, set_(x), P8[2][1]).by(P8).gen(A, true)
+
+P9.export("tuple_lemma_4")
+
+
 
 # start
 # TODO
