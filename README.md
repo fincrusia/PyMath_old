@@ -17,7 +17,6 @@ In **PyMath**, everything including sentences and terms are implemented as trees
 It has a member **"branch"**, which is simply a list of non-negative integers.
 
 When you assume something, an integer is appended at the end of the branch, so that the branch be longer.
-
 If you deduce a sentence *P*, a sentence *"assumption implies P"* has a branch of the original length.
 
 When you prove something, you can only use sentences with same or shorter branches, with compatible elements.
@@ -35,6 +34,10 @@ This is not a pretty way, but you have to do this when you *define* high-level c
 For example, the following code generates a variable named *"x"*:
 
     x = Variable("x")
+
+To use new variables, type:
+
+    clean_up()
 
 3. Using overloaded operators
 
