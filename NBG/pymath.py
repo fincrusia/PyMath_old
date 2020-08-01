@@ -656,6 +656,12 @@ def clean():
     global alpha
     alpha = Variable("alpha")
 
+def escape(variable):
+    N = Node.last.copy()
+    P = N.gen(variable, true)
+    Q = All(variable, P[2][0], P[2][1]).by(P)
+    return Q
+
 # constructors
 def _All(variable, bound, sentence):
     assert variable.is_variable()
@@ -1453,14 +1459,10 @@ with set_(x) as xs:
             P9 = Node.last.copy()
 
             P10 = (P4[0] // P4[1]).logic(P4, P9)
-        P11 = Node.last.copy().gen(z, true)
-        P12 = All(z, set_(z), P11[2][1]).by(P11)
-    P13 = Node.last.copy().gen(y, true)
-    P14 = All(y, set_(y), P13[2][1]).by(P13)
-P15 = Node.last.copy().gen(x, true)
-P16 = All(x, set_(x), P15[2][1]).by(P15).gen(A, true)
+        escape(z)
+    escape(y)
+escape(x).gen(A, true).export("tuple_lemma_3")
 
-P16.export("tuple_lemma_3")
 
 clean()
 with set_(x) as xs:
@@ -1469,14 +1471,10 @@ with set_(x) as xs:
             P1 = Node.theorems["tuple_lemma_3"].put(A, true).put(x, xs).put(y, ys).put(z, zs)
             P2 = Node.theorems["transposition"].put(product_by_V_function(A), true).put(x, xs).put(z, zs).put(y, ys)
             P3 = (P2[0] // P1[1]).logic(P1, P2)
-        P4 = Node.last.copy().gen(z, true)
-        P5 = All(z, set_(z), P4[2][1]).by(P4)
-    P6 = Node.last.copy().gen(y, true)
-    P7 = All(y, set_(y), P6[2][1]).by(P6)
-P8 = Node.last.copy().gen(x, true)
-P9 = All(x, set_(x), P8[2][1]).by(P8).gen(A, true)
+        escape(z)
+    escape(y)
+escape(x).gen(A, true).export("tuple_lemma_2")
 
-P9.export("tuple_lemma_2")
 
 clean()
 with set_(x) as xs:
@@ -1485,14 +1483,9 @@ with set_(x) as xs:
             P1 = Node.theorems["tuple_lemma_3"].put(A, true).put(x, xs).put(y, ys).put(z, zs)
             P2 = Node.theorems["circular_permutation"].put(product_by_V_function(A), true).put(z, zs).put(x, xs).put(y, ys)
             P3 = (P2[0] // P1[1]).logic(P1, P2)
-        P4 = Node.last.copy().gen(z, true)
-        P5 = All(z, set_(z), P4[2][1]).by(P4)
-    P6 = Node.last.copy().gen(y, true)
-    P7 = All(y, set_(y), P6[2][1]).by(P6)
-P8 = Node.last.copy().gen(x, true)
-P9 = All(x, set_(x), P8[2][1]).by(P8).gen(A, true)
-
-P9.export("tuple_lemma_1")
+        escape(z)
+    escape(y)
+escape(x).gen(A, true).export("tuple_lemma_1")
 
 # added
 clean()
@@ -1503,14 +1496,10 @@ with set_(x) as xs:
             P1 = Node.theorems["tuple_lemma_2"].put(A, true).put(x, xs).put(y, ys).put(z, zs)
             P2 = Node.theorems["circular_permutation"].put(T, true).put(y, ys).put(x, xs).put(z, zs)
             P3 = (P2[0] // P1[1]).logic(P1, P2)
-        P4 = Node.last.copy().gen(z, true)
-        P5 = All(z, set_(z), P4[2][1]).by(P4)
-    P6 = Node.last.copy().gen(y, true)
-    P7 = All(y, set_(y), P6[2][1]).by(P6)
-P8 = Node.last.copy().gen(x, true)
-P9 = All(x, set_(x), P8[2][1]).by(P8).gen(A, true)
+        escape(z)
+    escape(y)
+escape(x).gen(A, true).export("tuple_lemma_5")
 
-P9.export("tuple_lemma_5")
 
 clean()
 with set_(x) as xs:
@@ -1541,14 +1530,10 @@ with set_(x) as xs:
                 Q5 = Q1[0].logic(Q1, Q4)
             xy_A_to_xy_D = Node.last.copy()
             conclusion = ((yx @ D) // (xy @ A)).logic(xy_D_to_xy_A, xy_A_to_xy_D)
-        P4 = Node.last.copy().gen(z, true)
-        P5 = All(z, set_(z), P4[2][1]).by(P4)
-    P6 = Node.last.copy().gen(y, true)
-    P7 = All(y, set_(y), P6[2][1]).by(P6)
-P8 = Node.last.copy().gen(x, true)
-P9 = All(x, set_(x), P8[2][1]).by(P8).gen(A, true)
+        escape(z)
+    escape(y)
+escape(x).gen(A, true).export("tuple_lemma_4")
 
-P9.export("tuple_lemma_4")
 
 
 
