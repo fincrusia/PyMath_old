@@ -74,7 +74,7 @@ class Node:
             if self.type != A.type or self.name != A.name or len(self.children) != len(A.children):
                 return False
             for cursor in range(0, len(A.children)):
-                if not self[cursor].equal(A[cursor]):
+                if not self[cursor].equal(A[cursor], reason):
                     return False
             return True
 
@@ -108,7 +108,8 @@ class Node:
                 result += ")"
                 return result
         elif self.is_variable():
-            return self.name[:-5]
+            return self.name    
+            #return self.name[:-5]
         else:
             assert False
 
@@ -182,6 +183,9 @@ class Node:
 
     def __eq__(self, A):
         return Node("property", "equal", [self.copy(), A.copy()], {"binary" : "=="})
+
+    def __ne__(self, A):
+        return Node("logical", "not", [(self.copy() == A.copy())], {})
     
     def __lshift__(self, A):
         return Node("property", "inclusion", [self.copy(), A.copy()], {})
@@ -409,25 +413,32 @@ class Node:
         sentence_put.prove_CAUTION()
         return sentence_put
 
-    def _found(self, reason, term, variable):
+    found_term = None
+    def _found(self, reason, variable):
         if self.compare(reason):
             return True
-        elif self.compare(variable) and reason.compare(term):
-            return True
+        elif self.compare(variable):
+            if Node.found_term:
+                if reason.compare(Node.found_term):
+                    return True
+            else:
+                assert reason.is_term()
+                Node.found_term = reason.copy()
+                return True
         else:
             for index in range(0, len(self.children)):
-                if not self[index]._found(reason[index], term, variable):
+                if not self[index]._found(reason[index], variable):
                     return False
             return True
 
-    def found(self, reason, bound, term):
+    def found(self, reason, bound):
+        Node.found_term = None
         assert self.is_quantifier() and self.name == "exist"
         assert reason.is_proved()
-        assert term.is_term()
         assert bound.is_proved()
         variable = self[0].copy()
-        assert self[1]._found(bound, term, variable)
-        assert self[2]._found(reason, term, variable)
+        assert self[1]._found(bound, variable)
+        assert self[2]._found(reason, variable)
         self.prove_CAUTION()
         return self
 
@@ -512,6 +523,9 @@ class Node:
             new_bound = assumption
         else:
             new_bound = bound & assumption
+        #print("******")
+        #print(self)
+        #print(Node("quantifier", source.name, [x, new_bound, sentence], {}))
         assert self.compare(Node("quantifier", source.name, [x, new_bound, sentence], {}))
         self.prove_CAUTION()
         return self
@@ -562,10 +576,9 @@ class Node:
             function = Node.memory[name]
             node = function(self.copy(), *reasons)
             assert self.compare(node) and node.is_proved()
+            Node.marked_names.remove(name)
             if first_call:
                 Node.marked_names = None
-            else:
-                Node.marked_names.remove(name)
             return node
         else:
             prefix = arguments.get("prefix")
@@ -577,12 +590,15 @@ class Node:
                 try:
                     Node.marked_names.add(key)
                     node = function(self.copy(), *reasons)
-                    Node.marked_names.remove(key)
+                    if key in Node.marked_names:
+                        Node.marked_names.remove(key)
                     if node.is_proved() and self.compare(node):
                         if first_call:
                             Node.marked_names = None
                         return node
                 except:
+                    if key in Node.marked_names:
+                        Node.marked_names.remove(key)
                     continue
             assert False
 
@@ -612,7 +628,7 @@ y = None
 z = None
 alpha = None
 
-def clean_up():
+def clean():
     global A
     A = Variable("A")
     global B
@@ -718,11 +734,14 @@ remember("booting::bound::2", assumption_to_bound)
 # axiom scheme of equality
 def equal(A_is_B, *reasons):
     for reason in reasons:
-        assert reason.is_proved()
+        reason.is_proved()
+    reason = None
+    if reasons:
+        reason = reasons[0]
     assert A_is_B.is_property() and A_is_B.name == "equal" and len(A_is_B.children) == 2
     A = A_is_B[0]
     B = A_is_B[1]
-    if not reasons:
+    if not reason:
         assert A.compare(B)
     else:
         assert A.equal(B, reason)
@@ -731,8 +750,18 @@ def equal(A_is_B, *reasons):
 
 remember("booting::equal::1", equal)
 
+def equivalent(target, source, A_is_B):
+    assert source.is_proved()
+    assert A_is_B.is_proved()
+    assert A_is_B.is_property() and A_is_B.name == "equal"
+    assert target.equal(source, A_is_B)
+    target.prove_CAUTION()
+    return target
+
+remember("booting::equal::2", equivalent)
+
 # set
-clean_up()
+clean()
 definition_of_set, set_ = Exist(C, True_(), x @ C).say("set")
 C_is_set = C.name
 definition_of_set.export("set")
@@ -742,14 +771,14 @@ def is_set(target, source): # x in C => set_(x)
     C = source[1]
     P1 = Node.theorems["set"].put(x, true)
     C0 = P1.get_exist_variable()[0]
-    P2 = (Exist(C0, true, x @ C0)).found(source, true, C)
+    P2 = (Exist(C0, true, x @ C0)).found(source, true)
     return set_(x).logic(P1, P2)
 
 remember("booting::set::1", is_set)
 
 
 # axiom of extensionality
-clean_up()
+clean()
 extensionality = All(A, True_(), B, True_(), (All(x, set_(x), ((x @ A) // (x @ B))) >> (A == B)))
 extensionality.prove_CAUTION()
 extensionality.export("extensionality")
@@ -766,21 +795,51 @@ def uniqueness_from_extensionality(A, B, e, condition):
     return P2
 
 # axiom of pairing
-clean_up()
+clean()
 pairing = All(x, set_(x), y, set_(y), Exist(p, set_(p), All(z, set_(z), (z @ p) // ((z == x) | (z == y)))))
 pairing.prove_CAUTION()
 pairing.export("axiom_of_pairing")
-pairing, pairing_is_set, definition_of_pairing = pairing.let("pairing", binary = ",")
-definition_of_pairing.export("existence_of_pairing")
+pairing, pairing_is_set, definition_of_pairing = pairing.let("pairing", binary = "..")
+definition_of_pairing.export("definition_of_pairing")
 pairing_is_set.export("pairing_is_set")
 
 def Pairing(a, b):
-    return Node("function", "pairing", [a.copy(), b.copy()], {"binary" : ","})
+    return Node("function", "pairing", [a.copy(), b.copy()], {"binary" : ".."})
+
+empty = None
+def FiniteSet(*arguments):
+    if len(arguments) == 0:
+        return empty
+    elif len(arguments) == 1:
+        return arguments[0].copy()
+    else:
+        node = arguments[0].copy()
+        for argument in arguments[1:]:
+            node = Pairing(node, argument.copy())
+        return node
+
+def finite_set_is_set(target, *arguments):
+    variable_list = []
+    for argument in arguments:
+        variable_list.append(argument[0].copy())
+    node = None
+    sentence = None
+    for index, variable in enumerate(variable_list):
+        if index == 0:
+            sentence = arguments[0]
+            node = variable
+        else:
+            Node.theorems["pairing_is_set"].put(node, sentence)
+            sentence = Node.theorems["pairing_is_set"].put(node, sentence).put(variable, arguments[index])
+            node = Pairing(node, variable)
+    return sentence
+
+remember("booting::pairing::1", finite_set_is_set)
 
 def OrderedPair(a, b):
     return Pairing(Pairing(a, b), b)
 
-clean_up()
+clean()
 with set_(a) as ap:
     with set_(b) as bp:
         a_b_is_set = Node.theorems["pairing_is_set"].put(a, ap).put(b, bp)
@@ -795,7 +854,7 @@ a_b_is_set.export("ordered_pairing_is_set")
 
 def Tuple(*arguments):
     if len(arguments) == 0:
-        return Variable("0_uple")
+        return empty
     elif len(arguments) == 1:
         return arguments[0].copy()
     else:
@@ -911,7 +970,8 @@ def complement_law_4(target, source, bound): # ~(x in ~A) & set(x) => x in A
 
 remember("booting::complement::4", complement_law_4)
 
-clean_up()
+# empty set
+clean()
 empty = membership_class & (~membership_class)
 with (alpha @ empty) as P:
     alpha_in_E = (alpha @ membership_class).by(P)
@@ -919,10 +979,27 @@ with (alpha @ empty) as P:
     contradiction = false.logic(alpha_in_E, alpha_not_in_E)
 P = (~(alpha @ empty)).logic(Node.last)
 empty_has_no_elements = P.gen(alpha, set_(alpha))
-empty_has_no_elements = (Exist(x, true, All(alpha, set_(alpha), ~(alpha @ x)))).found(empty_has_no_elements, true, empty)
+empty_has_no_elements = (Exist(x, true, All(alpha, set_(alpha), ~(alpha @ x)))).found(empty_has_no_elements, true)
 empty_class, _, empty = empty_has_no_elements.let("empty")
 empty.export("empty")
 
+# has element => not empty
+def has_element_so_not_empty(target, source):
+    x = source[0]
+    A = source[1]
+    with A == empty_class as Ae:
+        xs = set_(x).by(source)
+        P = Node.theorems["empty"].put(x, xs)
+        #print(source)
+        #print(Ae)
+        Q = (x @ empty_class).by(source, Ae)
+        false.logic(P, Q)
+    R = (~(A == empty_class)).logic(Node.last.copy())
+    return R
+
+remember("booting::empty::1", has_element_so_not_empty)
+
+# V
 V = ~empty_class
 with set_(alpha) as P:
     alpha_in_V = (alpha @ V).by(Node.theorems["empty"].put(alpha, P), P)
@@ -930,36 +1007,295 @@ alpha_in_V = Node.last.copy()
 alpha_in_V = alpha_in_V.gen(alpha, true)
 alpha_in_V = (All(alpha, set_(alpha), (alpha @ V))).by(alpha_in_V)
 
-alpha_in_V = (Exist(C, true, All(alpha, set_(alpha), alpha @ C))).found(alpha_in_V, true, V)
+alpha_in_V = (Exist(C, true, All(alpha, set_(alpha), alpha @ C))).found(alpha_in_V, true)
 V, _, alpha_in_V = alpha_in_V.let("universe_V")
 alpha_in_V.export("V_has_everything")
 
 # domain
+clean()
 domain = All(A, true, Exist(B, true, All(x, set_(x), ((x @ B) // (Exist(y, set_(y), Tuple(x, y) @ A))))))
 domain.prove_CAUTION()
 domain_function, _, domain = domain.let("domain")
 domain.export("domain")
 
 # product by V
-u = Variable("u")
+clean()
 product_by_V = All(A, true, Exist(B, true, All(u, set_(u), ((u @ B) // (Exist(x, set_(x), y, set_(y), (u == Tuple(x, y)) & (x @ A)))))))
 product_by_V.prove_CAUTION()
 product_by_V_function, _, product_by_V = product_by_V.let("product_by_V")
 product_by_V.export("product_by_V")
 
 # circular permutation
+clean()
 circular_permutation = All(A, true, Exist(B, true, All(x, set_(x), y, set_(y), z, set_(z), ((Tuple(x, y, z) @ B) // (Tuple(y, z, x) @ A)))))
 circular_permutation.prove_CAUTION()
 circular_permutation_function, _, circular_permutation = circular_permutation.let("circular_permutation")
 circular_permutation.export("circular_permutation")
 
 # transposition
+clean()
 transposition = All(A, true, Exist(B, true, All(x, set_(x), y, set_(y), z, set_(z), ((Tuple(x, y, z) @ B) // (Tuple(x, z, y) @ A)))))
 transposition.prove_CAUTION()
 transposition_function, _, transposition = transposition.let("transposition")
 transposition.export("transposition")
 
+# regularity
+clean()
+regularity = All(a, set_(a), (a != empty_class) >> Exist(u, set_(u), (u @ a) & ((u & a) == empty_class)))
+regularity.prove_CAUTION()
+regularity.export("regularity")
 
+# theorem : (x, x) == {x}
+clean()
+with set_(x) as xs:
+    a = Pairing(x, x)
+    a_s = set_(a).by(xs, xs)
+    with set_(y) as ys:
+        P1 = Node.theorems["definition_of_pairing"].put(x, xs).put(x, xs).put(y, ys)
+        ((y @ a) // (y == x)).logic(P1)
+    P2 = Node.last.copy()
+    P3 = P2.gen(y, true)
+    P4 = (All(y, set_(y), ((y @ a) // (y == x)))).by(P3)
+P5 = Node.last.copy()
+P6 = P5.gen(x, true)
+P7 = All(x, set_(x), All(y, set_(y), ((y @ a) // (y == x)))).by(P6)
+P7.export("set_envelope")
+
+# theorem : no Quine
+clean()
+with set_(x) as xs:
+    with x @ x as xp:
+        a = Pairing(x, x)
+        a_s = set_(a).by(xs, xs)
+        P1 = Node.theorems["definition_of_pairing"].put(x, xs).put(x, xs).put(a, a_s)
+        P3 = (x == x).by()
+        P2 = Node.theorems["set_envelope"].put(x, xs).put(x, xs)
+        x_in_a = (x @ a).logic(P2, P3)
+        x_in_x_cap_a = (x @ (x & a)).by(xp, x_in_a)
+        P4 = Node.theorems["regularity"].put(a, a_s)
+        a_is_not_empty = (~(a == empty_class)).by(x_in_a)
+        P5 = P4[1].logic(a_is_not_empty, P4)
+        zf, zb, zs = P5.let("no_Quine_temporary")
+        P6 = (zf @ a).logic(zs)
+        P7 = Node.theorems["set_envelope"].put(x, xs).put(zf, zb)
+        P8 = (zf == x).logic(P6, P7)
+        P9 = ((x @ a) & ((x & a) == empty_class)).by(zs, P8)
+        x_cap_a_is_empty = ((x & a) == empty_class).logic(P9)
+        x_cap_a_is_not_empty = (~((x & a) == empty_class)).by(x_in_x_cap_a)
+        false.logic(x_cap_a_is_empty, x_cap_a_is_not_empty)
+    no_Quine = (~(x @ x)).logic(Node.last.copy())
+no_Quine = Node.last.copy().gen(x, true)
+no_Quine = All(x, set_(x), ~(x @ x)).by(no_Quine)
+no_Quine.export("no_Quine")
+
+# set(a), set(b) => a in Pairing(a, b)
+def in_pairing_a(target, a_s, bs):
+    a = a_s[0]
+    b = bs[0]
+    P = Node.theorems["definition_of_pairing"].put(a, a_s).put(b, bs).put(a, a_s)
+    a_is_a = (a == a).by()
+    return (a @ Pairing(a, b)).logic(a_is_a, P)
+
+remember("booting::pairing::2", in_pairing_a)
+
+
+# set(a), set(b) => b in Pairing(a, b)
+def in_pairing_b(target, a_s, bs):
+    a = a_s[0]
+    b = bs[0]
+    P = Node.theorems["definition_of_pairing"].put(a, a_s).put(b, bs).put(b, bs)
+    b_is_b = (b == b).by()
+    return (b @ Pairing(a, b)).logic(b_is_b, P)
+
+remember("booting::pairing::3", in_pairing_b)
+
+
+# axiom of union
+clean()
+punion = All(a, set_(a), Exist(b, set_(b), All(x, set_(x), (Exist(y, set_(y), (x @ y) & (y @ a))) >> (x @ b))))
+punion.prove_CAUTION()
+punion_function, punion_bound, punion_sentence = punion.let("primitive_union", unary = "pcup")
+punion_sentence.export("definition_of_punion")
+punion_bound.export("punion_is_set")
+
+def PUnion(x):
+    return Node("function", "primitive_union", [x.copy()], {"unary" : "pcup"})
+
+def PBinaryUnion(a, b):
+    return PUnion(Pairing(a, b))
+
+# (x in a or x in b) => x in (a cup b) 
+clean()
+with set_(a) as a_s:
+    with set_(b) as bs:
+        ab_s = set_(Pairing(a, b)).by(a_s, bs)
+        a_pcub_b_s = Node.theorems["punion_is_set"].put(Pairing(a, b), ab_s)
+        a_pcup_b = Node.theorems["definition_of_punion"].put(Pairing(a, b), ab_s)
+
+        with x @ a as xa:
+            xs = set_(x).by(xa)
+            y0 = a_pcup_b.get_exist_variable()[0]
+            P1 = a_pcup_b.put(x, xs)
+            a_in_ab = (a @ Pairing(a, b)).by(a_s, bs)
+            x_in_a_in_ab = ((x @ a) & (a @ Pairing(a, b))).logic(xa, a_in_ab)
+            P2 = Exist(y0, set_(y0), (x @ y0) & (y0 @ Pairing(a, b))).found(x_in_a_in_ab, a_s)
+            P3 = (x @ PBinaryUnion(a, b)).logic(P1, P2)
+        P4 = Node.last.copy()
+
+        with x @ b as xb:
+            xs = set_(x).by(xb)
+            y0 = a_pcup_b.get_exist_variable()[0]
+            P1 = a_pcup_b.put(x, xs)
+            b_in_ab = (b @ Pairing(a, b)).by(a_s, bs)
+            x_in_b_in_ab = ((x @ b) & (b @ Pairing(a, b))).logic(xb, b_in_ab)
+            P2 = Exist(y0, set_(y0), (x @ y0) & (y0 @ Pairing(a, b))).found(x_in_b_in_ab, bs)
+            P3 = (x @ PBinaryUnion(a, b)).logic(P1, P2)
+        P5 = Node.last.copy()
+
+        P6 = ((P4[0].copy() | P5[0].copy()) >> P4[1].copy()).logic(P4, P5)
+        P6 = P6.gen(x, set_(x))
+
+    P7 = Node.last.copy().gen(b, true)
+    All(b, set_(b), P7[2][1]).by(P7, name = "booting::bound::2")
+P8 = Node.last.copy().gen(a, true)
+P9 = All(a, set_(a), P8[2][1]).by(P8)
+P9.export("property_of_binary_punion")
+
+
+# x in A => A != empty
+def has_something_then_not_empty(target, source):
+    x = source[0]
+    A = source[1]
+    xs = set_(x).by(source)
+    with A == empty_class as Ae:
+        P1 = Node.theorems["empty"].put(x, xs)
+        P2 = (~(x @ A)).by(P1, Ae)
+        false.logic(source, P2)
+    P3 = (~(A == empty_class)).logic(Node.last.copy())
+    return P3
+
+remember("booting::empty::2", has_something_then_not_empty)
+
+# x in y and y in x => contradiction
+clean()
+with set_(x) as xs:
+    with set_(y) as ys:
+        with x @ y as x_in_y:
+            with y @ x as y_in_x:
+                P1 = Node.theorems["definition_of_pairing"].put(x, xs).put(y, ys)
+                u = Pairing(x, y)
+                us = set_(u).by(xs, ys)
+                P2 = Node.theorems["regularity"].put(u, us)
+                x_in_u = (x @ u).by(xs, ys)
+                y_in_u = (y @ u).by(xs, ys)
+                xy_is_not_empty = (~(u == empty_class)).by(x_in_u)
+                P3 = P2[1].logic(P2, xy_is_not_empty)
+                kf, kb, kc = P3.let("temp") # to be modified
+                P4 = Node.theorems["definition_of_pairing"].put(x, xs).put(y, ys).put(kf, kb)
+                P5 = ((kf == x) | (kf == y)).logic(P4, kc)
+                with kf == x as kx:
+                    P6 = ((kf & u) == empty_class).logic(kc)
+                    P7 = ((x & u) == empty_class).by(P6, kx)
+                    P8 = (y @ (x & u)).by(y_in_u, y_in_x)
+                    P9 = ((x & u) != empty_class).by(P8)
+                    false.logic(P7, P9)
+                P10 = (kf != x).logic(Node.last.copy())
+                P11 = (kf == y).logic(P5, P10)
+                P6 = ((kf & u) == empty_class).logic(kc)
+                P7 = ((y & u) == empty_class).by(P6, P11)
+                P8 = (x @ (y & u)).by(x_in_u, x_in_y)
+                P9 = ((y & u) != empty_class).by(P8)
+                false.logic(P7, P9)
+            P12 = Node.last.copy()
+        P13 = Node.last.copy()
+        P14 = (~((x @ y) & (y @ x))).logic(P13)
+    P15 = Node.last.copy().gen(y, true)
+    P16 = All(y, set_(y), P15[2][1]).by(P15)
+P17 = Node.last.copy().gen(x, true)
+P18 = All(x, set_(x), P17[2][1]).by(P17)
+P18.export("no_cyclic_inclusion")
+
+
+# (a, b) == (x, y) => (a == x and b == y)
+def ordered_pair_compare(target, source, *bounds):
+    ab = source[0]
+    a = ab[0][0]
+    b = ab[0][1]
+    xy = source[1]
+    x = xy[0][0]
+    y = xy[0][1]
+    
+    a_s = bounds[0]
+    bs = bounds[1]
+    xs = bounds[2]
+    ys = bounds[3]
+
+    ab_s = set_(ab).by(a_s, bs)
+    uab = Pairing(a, b)
+    uabs = set_(uab).by(a_s, bs)
+    a_in_abu = (a @ uab).by(a_s, bs)
+    b_in_abu = (b @ uab).by(a_s, bs)
+    uab_in_ab = (uab @ ab).by(uabs, bs)
+    b_in_ab = (b @ ab).by(uabs, bs)
+    
+    xys = set_(xy).by(xs, ys)
+    uxy = Pairing(x, y)
+    uxys = set_(uxy).by(xs, ys)
+    x_in_xyu = (x @ uxy).by(xs, ys)
+    y_in_xyu = (y @ uxy).by(xs, ys)
+    uxy_in_xy = (uxy @ xy).by(uxys, ys)
+    y_in_xy = (y @ xy).by(uxys, ys)
+
+    b_in_xy = (b @ xy).by(b_in_ab, source)
+    y_in_ab = (y @ ab).by(y_in_xy, source)
+
+    P = Node.theorems["definition_of_pairing"].put(uxy, uxys).put(y, ys).put(b, bs)
+    P = ((b == y) | (b == uxy)).logic(P, b_in_xy)
+
+    Q = Node.theorems["definition_of_pairing"].put(uab, uabs).put(b, bs).put(y, ys)
+    Q = ((y == b) | (y == uab)).logic(Q, y_in_ab)
+
+    with b != y as nby:
+        P = (b == uxy).logic(P, nby)
+        with y == b as yb:
+            by = (b == y).by(yb)
+            false.logic(by, nby)
+        nyb = (y != b).logic(Node.last.copy())
+        Q = (y == uab).logic(Q, nyb)
+
+        y_in_b = (y @ b).by(y_in_xyu, P)
+        b_in_y = (b @ y).by(b_in_abu, Q)
+
+        false.logic(y_in_b, b_in_y, Node.theorems["no_cyclic_inclusion"].put(b, bs).put(y, ys))
+    
+    by = (b == y).logic(Node.last.copy())
+
+
+
+
+clean()
+with set_(x) as xs:
+    with set_(y) as ys:
+        with set_(a) as a_s:
+            with set_(b) as bs:
+                with Tuple(a, b) == Tuple(x, y) as ab_xy:
+                    ordered_pair_compare(None, ab_xy, a_s, bs, xs, ys)
+
+
+# tuple lemma
+clean()
+with set_(x) as xs:
+    with set_(y) as ys:
+        with set_(z) as zs:
+            xyz = Tuple(x, y, z)
+            xyz_is_set = set_(xyz).by(xs, ys, zs)
+            P1 = Node.theorems["product_by_V"].put(A, true).put(xyz, xyz_is_set)
+            with xyz @ product_by_V_function(A) as xyz_in_A:
+                x0, y0 = P1.get_exist_variable()
+                P2 = Exist(x0, set_(x0), Exist(y0, set_(y0), ((xyz == Tuple(x0, y0)) & (x0 @ A)))).logic(P1, xyz_in_A)
+                x0_function, x0_bound, sentence = P2.let("tuple_lemma_x0")
+                y0_function, y0_bound, sentence = sentence.let("tuple_lemma_y0")
+                P3 = (xyz == Tuple(x0_function, y0_function)).logic(sentence)
 
 # start
 # TODO
