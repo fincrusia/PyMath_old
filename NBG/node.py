@@ -42,7 +42,7 @@ class Node:
     __branch = []
     __assumptions = []
     __non_generalizables = []
-    __last = None
+    last = None
 
     __logicals = ["and", "or", "not", "imply", "iff", "true", "false"]
     __quantifiers = ["all", "exist", "unique"]
@@ -113,9 +113,9 @@ class Node:
             return self.__name + "(" + self.variable().__name + ":" + str(self.statement()) + ")"
         elif self.is_logical() or self.is_property() or self.is_function():
             if self.__name in Node.pre_unaries.keys():
-                return "(" + Node.pre_unaries[self.__name] + str(self.body()) + ")"
+                return "(" + Node.pre_unaries[self.__name] + " " + str(self.body()) + ")"
             elif self.__name in Node.post_unaries.keys():
-                return "(" + str(self.body()) + Node.post_unaries[self.__name] + ")"
+                return "(" + str(self.body()) + " " + Node.post_unaries[self.__name] + ")"
             elif self.__name in Node.binaries.keys():
                 return "(" + str(self.left()) + " " + Node.binaries[self.__name] + " " + str(self.right()) + ")"
             elif self.__name in Node.associatives.keys():
@@ -157,7 +157,6 @@ class Node:
         Node.last = ((Node.__assumptions[Node.__cursor]) >> Node.last)
         Node.__cursor -= 1
         Node.last.__prove()
-
     
     # operators
     def __or__(self, A):
@@ -213,6 +212,8 @@ class Node:
 
     # queries
     def is_proved(self):
+        if self.__branch == None:
+            return False
         if len(self.__branch) > Node.__cursor + 1:
             return False
         for cursor in range(0, len(self.__branch)):
@@ -222,8 +223,6 @@ class Node:
 
     def is_generalizable(self):
         assert self.is_variable()
-        if self.__name[:len("RESERVED_LET")] == "RESERVED_LET":
-            return False
         for cursor in range(0, Node.__cursor + 1):
             if self.__name in Node.__non_generalizables[cursor]:
                 return False
@@ -242,7 +241,7 @@ class Node:
         return self.__type == "property" and self.__name == "equal" and len(self) == 2
 
     def is_function(self):
-        return self.__type == "property"
+        return self.__type == "function"
     
     def is_quantifier(self):
         return self.__type == "quantifier"
@@ -308,6 +307,9 @@ class Node:
     def right(self):
         assert len(self) == 2
         return self[1]
+
+    def name(self):
+        return self.__name
 
     # APIs
     def __get_free_names(self, bounded_names):
@@ -391,6 +393,15 @@ class Node:
             for exist_variable in child.get_exist_variables():
                 result.append(exist_variable)
         return result
+
+    def get_all_variables(self):
+        result = []
+        if self.is_quantifier and self.__name == "all":
+            result.append(self.variable())
+        for child in self.__children:
+            for exist_variable in child.get_all_variables():
+                result.append(exist_variable)
+        return result
     
 
     # prove
@@ -404,6 +415,7 @@ class Node:
         assert self.is_proved()
         assert self.is_closed()
         theorems[name] = self
+        #print(self) # verbose
 
     def put(self, term):
         assert self.is_proved()
@@ -414,6 +426,12 @@ class Node:
         sentence = self.statement().substitute(variable, term)
         sentence.__prove()
         return sentence
+
+    def bounded_put(self, term, bound):
+        assert self.is_proved()
+        assert bound.is_proved()
+        variable = self.variable()
+        return self.statement().right().substitute(variable, term).logic(bound, self.put(term))
 
     def assert_unique(self, variable):
         assert self.is_proved()
@@ -450,9 +468,15 @@ class Node:
 
         arguments = []
         cursor = self
-        while cursor.is_quantifier() and cursor.__type == "all":
-            arguments.append(cursor.variable)
+        bounds = []
+        while cursor.is_quantifier() and cursor.__name == "all":
+            arguments.append(cursor.variable())
             cursor = cursor.statement()
+            if cursor.is_logical() and cursor.__name == "imply":
+                bounds.append(cursor.left())
+                cursor = cursor.right()
+            else:
+                bounds.append(None)
 
         assert cursor.is_logical() and cursor.__name == "and"
         left = cursor.left()
@@ -462,20 +486,23 @@ class Node:
         assert (left.__name == "exist" and right.__name == "unique") or (left.__name == "unique" and right.__name == "exist")
         a = left.variable()
         b = right.variable()
-        assert left.substitute(a, b).compare(right)
+        assert left.statement().substitute(a, b).compare(right.statement())
         new_function = Function(name)
-        definition = left.substitute(a, new_function(*arguments))
-        for argument in reversed(arguments):
-            definition = All(argument, definition)
+        definition = left.statement().substitute(a, new_function(*arguments))
+        for index in reversed(range(0, len(arguments))):
+            if bounds[index] == None:
+                definition = All(arguments[index], definition)
+            else:
+                definition = All(arguments[index], bounds[index] >> definition)
         definition.__prove()
         return definition
 
     __let_counter = 0
-    def let(self):
+    def let(self, name):
         assert self.is_quantifier() and self.__name == "exist"
         exist_variable = self.variable()
         Node.__let_counter += 1
-        let_variable = "RESERVED_LET_" + str(Node.__let_counter)
+        let_variable = Variable(name)
         statement = self.statement().substitute(exist_variable, let_variable)
         statement.__prove()
         return statement
@@ -593,12 +620,16 @@ class Node:
                     assert self.compare(target)
                     new_choices.append((index, permute[permutation_index]))
                     Node.__marked_indexes.remove(index)
-                    return self
+                    return target
                 except:
                     if index in Node.__marked_indexes:
                         Node.__marked_indexes.remove(index)
                     continue
         assert False
+
+    def axiom(self):
+        self.__prove()
+        return self
 
 def pre_unary(name, operator):
     Node.pre_unaries[name] = operator
@@ -633,8 +664,5 @@ def Variable(name):
 def remember(inference):
     inferences.append(inference)
 
-pre_unary("not", "~")
-binary("and", "and")
-binary("or", "or")
-binary("imply", "imply")
-binary("iff", "iff")
+def escape():
+    return Node.last
