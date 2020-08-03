@@ -289,7 +289,7 @@ class Node:
 
     # access
     def body(self):
-        assert self.is_logical() and self.__name == "not"
+        assert len(self) == 1
         return self[0]
     
     def variable(self):
@@ -382,6 +382,10 @@ class Node:
                 return (not self.left().__logical_evaluation(truth)) or self.right().__logical_evaluation(truth)
             elif self.__name == "iff":
                 return self.left().__logical_evaluation(truth) == self.right().__logical_evaluation(truth)
+            elif self.__name == "true":
+                return True
+            elif self.__name == "false":
+                return False
             else:
                 assert False
 
@@ -523,7 +527,7 @@ class Node:
                 return False
             if self.__name != reason.__name:
                 return False
-            if len(self) != len(reason.children):
+            if len(self) != len(reason.__children):
                 return False
             for index in range(0, len(self)):
                 if not self[index].__found(reason[index]):

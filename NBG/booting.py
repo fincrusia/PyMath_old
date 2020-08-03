@@ -14,6 +14,9 @@ def logic(target, *sources):
 
 remember(logic)
 
+true = Node("logical", "true", []).by()
+false = Node("logical", "false", [])
+
 pre_unary("not", "not")
 binary("and", "and")
 binary("or", "or")
@@ -128,8 +131,13 @@ axiom_of_membership.axiom().export("axiom_of_membership")
 
 definition_of_membership_class = axiom_of_membership.let("membership_class")
 
+def Membership_class():
+    return Node("variable", "membership_class", [])
 
 # intersection_function
+clean()
+from variables import *
+
 axiom_of_intersection = All(A, All(B, Exist(C, All(x, Set(x) >> ((x @ C) == ((x @ A) & (x @ B)))))))
 axiom_of_intersection.axiom().export("axiom_of_intersection")
 
@@ -145,3 +153,71 @@ binary("cap", "cap")
 
 def Cap(A, B):
     return Node("function", "cap", [A, B])
+
+def property_of_cap_left(target, x_in_A_cap_B):
+    x = x_in_A_cap_B.left()
+    xs = Set(x).by(x_in_A_cap_B)
+    A = x_in_A_cap_B.right().left()
+    B = x_in_A_cap_B.right().right()
+    definition_of_cap = theorems["definition_of_cap"].put(A).put(B).bounded_put(x, xs)
+    return (x @ A).by(definition_of_cap, x_in_A_cap_B)
+
+remember(property_of_cap_left)
+
+def property_of_cap_right(target, x_in_A_cap_B):
+    x = x_in_A_cap_B.left()
+    xs = Set(x).by(x_in_A_cap_B)
+    A = x_in_A_cap_B.right().left()
+    B = x_in_A_cap_B.right().right()
+    definition_of_cap = theorems["definition_of_cap"].put(A).put(B).bounded_put(x, xs)
+    return (x @ B).by(definition_of_cap, x_in_A_cap_B)
+
+remember(property_of_cap_right)
+
+
+# complement_function
+clean()
+from variables import *
+
+axiom_of_complement = All(A, Exist(B, All(x, Set(x) >> ((x @ B) == ~(x @ A)))))
+axiom_of_complement.axiom().export("axiom_of_complement")
+
+uniqueness_of_complement = Unique(B, All(x, Set(x) >> ((x @ B) == ~(x @ A))))
+uniqueness_of_complement = uniqueness_of_complement.by()
+uniquely_exist = (uniqueness_of_complement & axiom_of_complement.put(A)).by(uniqueness_of_complement, axiom_of_complement.put(A))
+uniquely_exist = uniquely_exist.gen(A)
+
+definition_of_complement = uniquely_exist.define_function("complement")
+definition_of_complement.export("definition_of_complement")
+
+def Complement(A):
+    return Node("function", "complement", [A])
+
+def property_of_complement(target, x_in_cA):
+    x = x_in_cA.left()
+    xs = Set(x).by(x_in_cA)
+    A = x_in_cA.right().body()
+    definition_of_complement = theorems["definition_of_complement"].put(A).bounded_put(x, xs)
+    return (~(x @ A)).by(definition_of_complement, x_in_cA)
+
+remember(property_of_complement)
+
+# empty_class
+clean()
+from variables import *
+
+E = Membership_class()
+empty_class = E & ~E
+with x @ empty_class as xe:
+    xE = property_of_cap_left(x @ E, xe)
+    xE = (x @ E).by(xe)
+    xcE = (x @ ~E).by(xe)
+    nxE = (~(x @ E)).by(xcE)
+    false.by(xE, nxE)
+nxe = (~(x @ empty_class)).by(escape())
+nxe = (Set(x) >> nxe).by(nxe).gen(x)
+existence_of_empty_class = Exist(A, All(x, Set(x) >> ~(x @ A))).found(nxe)
+uniqueness_of_empty_class = Unique(A, All(x, Set(x) >> ~(x @ A))).by()
+
+uniquely_exist = (existence_of_empty_class & uniqueness_of_empty_class).by(existence_of_empty_class, uniqueness_of_empty_class)
+definition_of_empty_class = uniquely_exist.define_function("empty_class").export("definition_of_empty_class")
