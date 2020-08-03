@@ -64,7 +64,7 @@ class Node:
         elif type_ == "atomic":
             assert isinstance(name, int)
         else:
-            assert type_ in ["function", "property", "variable"]
+            assert type_ in ["function", "property", "variable", "none"]
 
         self.__type = type_
         self.__name = name
@@ -181,6 +181,8 @@ class Node:
         return Node("logical", "imply", [self, A])
 
     def __eq__(self, A):
+        if A.is_none():
+            return self.is_none()
         if self.is_sentence():
             return Node("logical", "iff", [self, A])
         elif self.is_term():
@@ -227,6 +229,9 @@ class Node:
             if self.__name in Node.__non_generalizables[cursor]:
                 return False
         return True
+
+    def is_none(self):
+        return self.__type == "none"
 
     def is_logical(self):
         return self.__type == "logical"
@@ -480,8 +485,8 @@ class Node:
                 bounds.append(cursor.left())
                 cursor = cursor.right()
             else:
-                bounds.append(None)
-
+                bounds.append(NoneNode("DF"))
+        
         assert cursor.is_logical() and cursor.__name == "and"
         left = cursor.left()
         right = cursor.right()
@@ -493,8 +498,9 @@ class Node:
         assert left.statement().substitute(a, b).compare(right.statement())
         new_function = Function(name)
         definition = left.statement().substitute(a, new_function(*arguments))
+        
         for index in reversed(range(0, len(arguments))):
-            if bounds[index] == None:
+            if bounds[index] == NoneNode("DF"):
                 definition = All(arguments[index], definition)
             else:
                 definition = All(arguments[index], bounds[index] >> definition)
@@ -664,6 +670,9 @@ def Function(name):
 
 def Variable(name):
     return Node("variable", name, [])
+
+def NoneNode(name):
+    return Node("none", name, [])
 
 def remember(inference):
     inferences.append(inference)

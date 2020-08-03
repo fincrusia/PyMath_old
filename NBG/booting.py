@@ -123,6 +123,28 @@ def Pairing(a, b):
 
 binary("pairing", "#")
 
+def pairing_is_set(target, as_, bs):
+    a = as_.body()
+    b = bs.body()
+    definition_of_pairing = theorems["definition_of_pairing"].bounded_put(a, as_).bounded_put(b, bs)
+    abs_ = Set(Pairing(a, b)).by(definition_of_pairing)
+    return abs_
+
+remember(pairing_is_set)
+
+def property_of_pairing(target, x_in_a_pair_b, as_, bs):
+    x = x_in_a_pair_b.left()
+    a = x_in_a_pair_b.right().left()
+    b = x_in_a_pair_b.right().right()
+    xs = Set(x).by(x_in_a_pair_b)
+    definition_of_pairing = theorems["definition_of_pairing"].bounded_put(a, as_).bounded_put(b, bs)
+    P = definition_of_pairing.right().by(definition_of_pairing).bounded_put(x, xs)
+    P = P.right().by(P, x_in_a_pair_b)
+    return P
+
+remember(property_of_pairing)
+
+
 # membership_class
 clean()
 from variables import *
@@ -230,3 +252,4 @@ def EmptyClass():
 # definition_of_ordered_pair
 def OrderedPair(a, b):
     return Pairing(Pairing(a, a), Pairing(a, b))
+
