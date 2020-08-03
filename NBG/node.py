@@ -116,7 +116,7 @@ class Node:
             elif self.__name in Node.post_unaries.keys():
                 return "(" + str(self.body()) + Node.post_unaries[self.__name] + ")"
             elif self.__name in Node.binaries.keys():
-                return "(" + str(self.left()) + Node.binaries[self.__name] + str(self.right()) + ")"
+                return "(" + str(self.left()) + " " + Node.binaries[self.__name] + " " + str(self.right()) + ")"
             elif self.__name in Node.associatives.keys():
                 result = "("
                 for index, child in enumerate(self.__children):
@@ -126,7 +126,7 @@ class Node:
                 result += ")"
                 return result
             else:
-                result = "("
+                result = self.__name + "("
                 for index, child in enumerate(self.__children):
                     result += str(child)
                     if index != len(self.__children) - 1:
@@ -313,7 +313,7 @@ class Node:
         if self.is_variable() and not self.__name in bounded_names:
             return set([self.__name])
         if self.is_quantifier():
-            bounded_names |= set([self.variable().name])
+            bounded_names |= set([self.variable().__name])
         free_names = set()
         for child in self.__children:
             free_names |= child.__get_free_names(bounded_names)
@@ -467,7 +467,7 @@ class Node:
         for argument in reversed(arguments):
             definition = All(argument, definition)
         definition.__prove()
-        return new_function, definition
+        return definition
 
     __let_counter = 0
     def let(self):
@@ -526,11 +526,11 @@ class Node:
         free_variables = []
         for free_name in free_names:
             free_variables.append(Variable(free_name))
-        definition = new_property(*free_variables) // self
+        definition = (new_property(*free_variables) == self)
         for free_variable in reversed(free_variables):
             definition = All(free_variable, definition)
         definition.__prove()
-        return new_property, definition
+        return definition
 
     def logic(self, *reasons):
         for reason in reasons:
@@ -625,169 +625,8 @@ def Variable(name):
 def remember(inference):
     inferences.append(inference)
 
-a = None
-b = None
-c = None
-d = None
-e = None
-f = None
-g = None
-h = None
-i = None
-j = None
-k = None
-l = None
-m = None
-n = None
-o = None
-p = None
-q = None
-r = None
-s = None
-t = None
-u = None
-v = None
-w = None
-x = None
-y = None
-z = None
-
-A = None
-B = None
-C = None
-D = None
-E = None
-F = None
-G = None
-H = None
-I = None
-J = None
-K = None
-L = None
-M = None
-N = None
-O = None
-P = None
-Q = None
-R = None
-S = None
-T = None
-U = None
-V = None
-W = None
-X = None
-Y = None
-Z = None
-
-clean_counter = 0
-def clean():
-    global clean_counter
-    clean_counter += 1
-
-    global a
-    a = Variable("a" + str(clean_counter))
-    global b
-    b = Variable("b" + str(clean_counter))
-    global c
-    c = Variable("c" + str(clean_counter))
-    global d
-    d = Variable("d" + str(clean_counter))
-    global e
-    e = Variable("e" + str(clean_counter))
-    global f
-    f = Variable("f" + str(clean_counter))
-    global g
-    g = Variable("g" + str(clean_counter))
-    global h
-    h = Variable("h" + str(clean_counter))
-    global i
-    i = Variable("i" + str(clean_counter))
-    global j
-    j = Variable("j" + str(clean_counter))
-    global k
-    k = Variable("k" + str(clean_counter))
-    global l
-    l = Variable("l" + str(clean_counter))
-    global m
-    m = Variable("m" + str(clean_counter))
-    global n
-    n = Variable("n" + str(clean_counter))
-    global o
-    o = Variable("o" + str(clean_counter))
-    global p
-    p = Variable("p" + str(clean_counter))
-    global q
-    q = Variable("q" + str(clean_counter))
-    global r
-    r = Variable("r" + str(clean_counter))
-    global s
-    s = Variable("s" + str(clean_counter))
-    global t
-    t = Variable("t" + str(clean_counter))
-    global u
-    u = Variable("u" + str(clean_counter))
-    global v
-    v = Variable("v" + str(clean_counter))
-    global w
-    w = Variable("w" + str(clean_counter))
-    global x
-    x = Variable("x" + str(clean_counter))
-    global y
-    y = Variable("y" + str(clean_counter))
-    global z
-    z = Variable("z" + str(clean_counter))
-
-    global A
-    A = Variable("A" + str(clean_counter))
-    global B
-    B = Variable("B" + str(clean_counter))
-    global C
-    C = Variable("C" + str(clean_counter))
-    global D
-    D = Variable("D" + str(clean_counter))
-    global E
-    E = Variable("E" + str(clean_counter))
-    global F
-    F = Variable("F" + str(clean_counter))
-    global G
-    G = Variable("G" + str(clean_counter))
-    global H
-    H = Variable("H" + str(clean_counter))
-    global I
-    I = Variable("I" + str(clean_counter))
-    global J
-    J = Variable("J" + str(clean_counter))
-    global K
-    K = Variable("K" + str(clean_counter))
-    global L
-    L = Variable("L" + str(clean_counter))
-    global M
-    M = Variable("M" + str(clean_counter))
-    global N
-    N = Variable("N" + str(clean_counter))
-    global O
-    O = Variable("O" + str(clean_counter))
-    global P
-    P = Variable("P" + str(clean_counter))
-    global Q
-    Q = Variable("Q" + str(clean_counter))
-    global R
-    R = Variable("R" + str(clean_counter))
-    global S
-    S = Variable("S" + str(clean_counter))
-    global T
-    T = Variable("T" + str(clean_counter))
-    global U
-    U = Variable("U" + str(clean_counter))
-    global V
-    V = Variable("V" + str(clean_counter))
-    global W
-    W = Variable("W" + str(clean_counter))
-    global X
-    X = Variable("X" + str(clean_counter))
-    global Y
-    Y = Variable("Y" + str(clean_counter))
-    global Z
-    Z = Variable("Z" + str(clean_counter))
-
-
+pre_unary("not", "~")
+binary("and", "and")
+binary("or", "or")
+binary("imply", "imply")
+binary("iff", "iff")
