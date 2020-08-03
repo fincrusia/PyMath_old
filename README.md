@@ -26,7 +26,7 @@ When you prove something, you can only use sentences with same or shorter branch
 ## Generating Nodes
 There are three ways to generate node.
 
-1. Using constructor of **Node**
+1. Using the constructor of **Node**
 
 This is not a pretty way, but you have to do this when you *define* high-level constructors.
 
