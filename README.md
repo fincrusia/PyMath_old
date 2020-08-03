@@ -28,6 +28,8 @@ There are three ways to generate node.
 
 1. Using the constructor of **Node**
 
+    x = Node("variable", "x", [])
+
 This is not a pretty way, but you have to do this when you *define* high-level constructors.
 
 2. Using defined constructors
@@ -101,7 +103,7 @@ So you have to prove by steps, using the following APIs:
 
     a_is_b = Unique(c, Q(c)).expand_unique(a, b)   # a == b
 
-4. *found()* : from an instance, assert existence.
+4. *found()* : from an instance, assert the     existence.
 
     Exist(x, R(x)).found(R(a))   # Exist(x, R(x))
 
@@ -126,8 +128,6 @@ One of the key-features of PyMath is auto-deduction.
 Basically it is not a sort of AI, proving something you didn't prove.
 
 But since we are working on the Python, you can freely add functions generating proofs.
-
-These "meta-theorems" can be added to *Node.memory*.
 
 When you call the *by()* method, PyMath brutally applies all the meta-theorems to the given reasons.
 
@@ -154,7 +154,7 @@ You can export theorems so that they can be used in the other files:
 
     ...
 
-    theorems["name_of_the_theorem"]  # returns the theorem
+    theorems["name_of_the_theorem"]  # returns A
 
 
 
@@ -167,10 +167,10 @@ You can export theorems so that they can be used in the other files:
 
 #### Each top-level folder is dedicated for one axiomatic system, and the folders **MUST NOT** import each other.
 
-For instance, a result of the ZF theory should not referred in the ZFC theory. Why? Even ZFC is stronger than ZF, properties and functions in ZF are not guaranteed to have same definitions with their counterparts in ZFC. Probabily the formers are longer, since ZF has fewer tools to define shortly. Hence, ZF and ZFC theories are not "synced" in general.
+For instance, a result of the ZF theory should not referred in the ZFC theory. Why? Even ZFC is stronger than ZF, properties and functions in ZF are not guaranteed to have same definitions with their counterparts in ZFC. Probabily the formers are longer, since ZF has fewer tools to define it shortly. Hence, ZF and ZFC theories are not "synced" in general.
 
-#### Node is immutable. **DO NOT** change.
+#### Nodes are immutable. **DO NOT** change them.
 
-#### (Recommended) Rather than doing same things, use meta-theorems!
+#### (Recommended) Rather than doing same things, create and use meta-theorems!
 
-Making easy-to-use Python methods will contribute to the overall theory. Coding Generic functions might not be easy, but hope we choose the better way for the future.
+Making easy-to-use Python methods will contribute to the overall theory. Coding generic functions might not be easy, but hope we choose the better way for the future.
