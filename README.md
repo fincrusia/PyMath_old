@@ -28,9 +28,10 @@ There are three ways to generate node.
 
 1. Using the constructor of **Node**.
 
+This is not a pretty way, but you have to do this when you *define* high-level constructors.
+
     x = Node("variable", "x", [])
 
-This is not a pretty way, but you have to do this when you *define* high-level constructors.
 
 2. Using defined constructors
 
