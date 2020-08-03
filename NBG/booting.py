@@ -121,6 +121,7 @@ uniquely_exist.define_function("pairing").export("definition_of_pairing")
 def Pairing(a, b):
     return Node("function", "pairing", [a, b])
 
+binary("pairing", "#")
 
 # membership_class
 clean()
@@ -221,3 +222,11 @@ uniqueness_of_empty_class = Unique(A, All(x, Set(x) >> ~(x @ A))).by()
 
 uniquely_exist = (existence_of_empty_class & uniqueness_of_empty_class).by(existence_of_empty_class, uniqueness_of_empty_class)
 definition_of_empty_class = uniquely_exist.define_function("empty_class").export("definition_of_empty_class")
+
+def EmptyClass():
+    return Node("function", "empty_class", [])
+
+
+# definition_of_ordered_pair
+def OrderedPair(a, b):
+    return Pairing(Pairing(a, a), Pairing(a, b))
