@@ -4,6 +4,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import pickle
 import atexit
+from itertools import permutations
 
 # load theorems
 theorems_file_name = "theorems.txt"
@@ -75,10 +76,10 @@ class Node:
         if self.__type != A.__type:
             return False
         if self.__name != A.__name:
-            assert False
+            return False
         if len(self) != len(A):
-            assert False
-        for child_index in range(0, self.__children):
+            return False
+        for child_index in range(0, len(self)):
             if not self[child_index].compare(A[child_index]):
                 return False
         return True
@@ -323,7 +324,7 @@ class Node:
         return self.__get_free_names(set())
 
     def __substitute(self, variable, term):
-        if self.is_variable() and self.__name == variable.name:
+        if self.is_variable() and self.__name == variable.__name:
             return term
         elif self.is_quantifier() and self.variable().__name in term.get_free_names():
             assert False # for readability
@@ -382,12 +383,12 @@ class Node:
             else:
                 assert False
 
-    def get_exist_variable(self):
+    def get_exist_variables(self):
         result = []
         if self.is_quantifier and self.__name == "exist":
             result.append(self.variable())
         for child in self.__children:
-            for exist_variable in child.get_exist_variable():
+            for exist_variable in child.get_exist_variables():
                 result.append(exist_variable)
         return result
     
@@ -423,10 +424,10 @@ class Node:
         assert a.is_variable()
         assert b.is_variable()
         statement = self.statement().statement()
-        assert statement.is_logical() and statement.name == "imply"
+        assert statement.is_logical() and statement.__name == "imply"
         assumption = statement.left()
         conclusion = statement.right()
-        assert assumption.is_logical() and assumption.name == "and"
+        assert assumption.is_logical() and assumption.__name == "and"
         left = assumption.left()
         right = assumption.right()
         assert left.substitute(a, b).compare(right)
@@ -559,7 +560,6 @@ class Node:
                     break
             if not is_the_case:
                 continue
-
             assert self_decomposition.__logical_evaluation(truth)
         
         self.__prove()
@@ -568,28 +568,36 @@ class Node:
     __by_counter = -1
     __marked_indexes = set()
     choices = None
+    __follow_history = True
     def by(self, *reasons):
         Node.__by_counter += 1
-        if Node.__by_counter < len(choices):
+        if Node.__follow_history and Node.__by_counter < len(choices):
             try:
-                inferences[choices[Node.__by_counter]](self, *reasons)
+                assert len(reasons) == len(choices[Node.__by_counter][1])
+                reasons_permuted = [reasons[choices[Node.__by_counter][1][x]] for x in range(0, len(reasons))]
+                inferences[choices[Node.__by_counter][0]](self, *reasons_permuted)
                 new_choices.append(choices[Node.__by_counter])
                 return self
             except:
-                pass
-        for index, inference in enumerate(inferences):
-            if index in Node.__marked_indexes:
-                continue
-            try:
-                Node.__marked_indexes.add(index)
-                inference(self, *reasons)
-                new_choices.append(index)
-                Node.__marked_indexes.remove(index)
-                return self
-            except:
+                Node.__follow_history = False
+        permute = list(permutations(range(0, len(reasons))))
+        for permutation_index in range(0, len(permute)):
+            for index, inference in enumerate(inferences):
                 if index in Node.__marked_indexes:
+                    continue
+                try:
+                    Node.__marked_indexes.add(index)
+                    reasons_permuted = [reasons[permute[permutation_index][x]] for x in range(0, len(reasons))]
+                    target = inference(self, *reasons_permuted)
+                    assert target.is_proved()
+                    assert self.compare(target)
+                    new_choices.append((index, permute[permutation_index]))
                     Node.__marked_indexes.remove(index)
-                continue
+                    return self
+                except:
+                    if index in Node.__marked_indexes:
+                        Node.__marked_indexes.remove(index)
+                    continue
         assert False
 
 def pre_unary(name, operator):
