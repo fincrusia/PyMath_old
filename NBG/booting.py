@@ -23,6 +23,36 @@ binary("or", "or")
 binary("imply", "imply")
 binary("iff", "iff")
 
+
+# equality
+binary("equal", "==")
+
+def use_of_equality(target, *reasons):
+    return target.equal(*reasons)
+
+remember(use_of_equality)
+
+def reflection_of_equality(target, A_is_B):
+    A = A_is_B.left()
+    B = A_is_B.right()
+    B_is_B = (B == B).by()
+    B_is_A = (B == A).by(B_is_B, A_is_B)
+    return B_is_A
+
+remember(reflection_of_equality)
+
+def reflection_of_non_equality(target, A_is_not_B):
+    A_is_B = A_is_not_B.body()
+    A = A_is_B.left()
+    B = A_is_B.right()
+    with B == A as B_is_A:
+        A_is_B = (A == B).by(B_is_A)
+        false.by(A_is_B, A_is_not_B)
+    B_is_not_A = (B != A).by(escape())
+    return B_is_not_A
+
+remember(reflection_of_non_equality)
+
 # definition of set
 clean()
 from variables import *
@@ -132,7 +162,7 @@ def pairing_is_set(target, as_, bs):
 
 remember(pairing_is_set)
 
-def property_of_pairing(target, x_in_a_pair_b, as_, bs):
+def property_of_pairing_1(target, x_in_a_pair_b, as_, bs):
     x = x_in_a_pair_b.left()
     a = x_in_a_pair_b.right().left()
     b = x_in_a_pair_b.right().right()
@@ -142,7 +172,39 @@ def property_of_pairing(target, x_in_a_pair_b, as_, bs):
     P = P.right().by(P, x_in_a_pair_b)
     return P
 
-remember(property_of_pairing)
+remember(property_of_pairing_1)
+
+def property_of_pairing_2(target, as_, bs):
+    a = as_.body()
+    b = bs.body()
+    definition_of_pairing = theorems["definition_of_pairing"].bounded_put(a, as_).bounded_put(b, bs)
+    definition_of_pairing = definition_of_pairing.right().by(definition_of_pairing).bounded_put(a, as_)
+    result = (a @ Pairing(a, b)).by(definition_of_pairing, (a == a).by())
+    return result
+
+remember(property_of_pairing_2)
+
+def property_of_pairing_3(target, as_, bs):
+    a = as_.body()
+    b = bs.body()
+    definition_of_pairing = theorems["definition_of_pairing"].bounded_put(a, as_).bounded_put(b, bs)
+    definition_of_pairing = definition_of_pairing.right().by(definition_of_pairing).bounded_put(b, bs)
+    result = (b @ Pairing(a, b)).by(definition_of_pairing, (b == b).by())
+    return result
+
+remember(property_of_pairing_3)
+
+def property_of_pairing_4(target, x_in_uaa, as_):
+    a = as_.body()
+    x = x_in_uaa.left()
+    xs = Set(x).by(x_in_uaa)
+    definition_of_pairing = theorems["definition_of_pairing"].bounded_put(a, as_).bounded_put(a, as_)
+    definition_of_pairing = definition_of_pairing.right().by(definition_of_pairing).bounded_put(x, xs)
+    x_is_a_or_a = ((x == a) | (x == a)).by(definition_of_pairing, x_in_uaa)
+    x_is_a = (x == a).by(x_is_a_or_a)
+    return x_is_a
+
+remember(property_of_pairing_4)
 
 
 # membership_class
@@ -250,6 +312,107 @@ def EmptyClass():
 
 
 # ordered_pair
+clean()
+from variables import *
+
 def OrderedPair(a, b):
     return Pairing(Pairing(a, a), Pairing(a, b))
+
+def ordered_pair_is_set(target, as_, bs):
+    a = as_.body()
+    b = bs.body()
+    uab = Pairing(a, b)
+    uaa = Pairing(a, a)
+    ab = OrderedPair(a, b)
+    uabs = Set(uab).by(as_, bs)
+    uaas = Set(uaa).by(as_, as_)
+    abs_ = Set(ab).by(uaas, uabs)
+    return abs_
+
+remember(ordered_pair_is_set)
+
+with Set(a) as as_:
+    with Set(b) as bs:
+        with Set(x) as xs:
+            with Set(y) as ys:
+                uab = Pairing(a, b)
+                uxy = Pairing(x, y)
+                uaa = Pairing(a, a)
+                uaas = Set(uaa).by(as_, as_)
+                uxx = Pairing(x, x)
+                uxxs = Set(uxx).by(xs, xs)
+                uabs = Set(uab).by(as_, bs)
+                uxys = Set(uxy).by(xs, ys)
+                ab = OrderedPair(a, b)
+                xy = OrderedPair(x, y)
+                abs_ = Set(ab).by(as_, bs)
+                xys = Set(xy).by(xs, ys)
+                with ab == xy as ab_xy:
+                    a_in_uaa = (a @ uaa).by(as_, as_)
+                    a_in_uab = (a @ uab).by(as_, bs)
+                    with c @ ab as c_ab:
+                        c_is_uaa_or_uab = ((c == uaa) | (c == uab)).by(c_ab, uaas, uabs)
+                        with c == uaa as c_is_uaa:
+                            a_in_c = (a @ c).by(a_in_uaa, c_is_uaa)
+                        c_is_uaa_case = escape()
+                        with c == uab as c_is_uab:
+                            a_in_c = (a @ c).by(a_in_uab, c_is_uab)
+                        c_is_uab_case = escape()
+                        a_in_c = (a @ c).by(c_is_uaa_case, c_is_uab_case, c_is_uaa_or_uab)
+                    a_in_uxx = escape().gen(c).put(uxx)
+                    uxx_in_ab = (uxx @ ab).by((uxx @ xy).by(uxxs, uxys), ab_xy)
+                    a_in_uxx = (a @ uxx).by(a_in_uxx, uxx_in_ab)
+                    a_is_x = (a == x).by(a_in_uxx, xs)
+
+                    uab_in_xy = (uab @ xy).by((uab @ ab).by(uaas, uabs), ab_xy)
+                    uab_is_uxx_or_uxy = ((uab == uxx) | (uab == uxy)).by(uab_in_xy, uxxs, uxys)
+                    b_in_uab = (a @ uab).by(as_, bs)
+                    with x == y as x_is_y:
+                        uxx_is_uxy = (uxx == uxy).by((uxx == uxx).by(), x_is_y)
+                        uab_is_uxx_or_uxx = ((uab == uxx) | (uab == uxx)).by(uab_is_uxx_or_uxy, uxx_is_uxy)
+                        uab_is_uxx = (uab == uxx).by(uab_is_uxx_or_uxx)
+                        b_in_uxx = (b @ uxx).by(b_in_uab, uab_is_uxx)
+                        b_is_x = (b == x).by(b_in_uxx, xs)
+                        b_is_y = (b == y).by(b_is_x, x_is_y)
+                        y_is_b = (y == b).by(b_is_y)
+                    x_is_y_then_y_is_b = escape()
+
+                    uxy_in_ab = (uxy @ ab).by((uxy @ xy).by(uxxs, uxys), ab_xy)
+                    uxy_is_uaa_or_uab = ((uxy == uaa) | (uxy == uab)).by(uxy_in_ab, uaas, uabs)
+                    y_in_uxy = (x @ uxy).by(xs, ys)
+                    with a == b as a_is_b:
+                        uaa_is_uab = (uaa == uab).by((uaa == uaa).by(), a_is_b)
+                        uxy_is_uaa_or_uaa = ((uxy == uaa) | (uxy == uaa)).by(uxy_is_uaa_or_uab, uaa_is_uab)
+                        uxy_is_uaa = (uxy == uaa).by(uxy_is_uaa_or_uaa)
+                        y_in_uaa = (y @ uaa).by(y_in_uxy, uxy_is_uaa)
+                        y_is_a = (y == a).by(y_in_uaa, as_)
+                        y_is_b = (y == b).by(y_is_a, a_is_b)
+                    a_is_b_then_y_is_b = escape()
+
+                    with a != b as a_is_not_b:
+                        with x != y as x_is_not_y:
+                            a_is_not_y = (a != y).by(x_is_not_y, a_is_x)
+                            with uxy == uaa as uxy_is_uaa:
+                                y_in_uaa = (y @ uaa).by(y_in_uxy, uxy_is_uaa)
+                                y_is_a = (y == a).by(y_in_uaa, as_)
+                                a_is_y = (a == y).by(y_is_a)
+                                false.by(a_is_y, a_is_not_y)
+                            uxy_is_not_uaa = (uxy != uaa).by(escape())
+                            uxy_is_uab = (uxy == uab).by(uxy_is_uaa_or_uab, uxy_is_not_uaa)
+                            y_in_uab = (y @ uab).by(y_in_uxy, uxy_is_uab)
+                            y_is_a_or_b = ((y == a) | (y == b)).by(y_in_uab, as_, bs)
+                            y_is_not_a = (y != a).by(a_is_not_y)
+                            y_is_b = (y == b).by(y_is_a_or_b, y_is_not_a)
+                    a_is_not_b_and_x_is_not_y_then_y_is_b = escape()
+
+                    y_is_b = (y == b).by(a_is_b_then_y_is_b, x_is_y_then_y_is_b, a_is_not_b_and_x_is_not_y_then_y_is_b)
+                    a_is_x_and_y_is_b = a_is_x & y_is_b
+            escape(y)
+        escape(x)
+    escape(b)
+escape(a).export("comparison_of_ordered_pair")
+
+
+                            
+
 

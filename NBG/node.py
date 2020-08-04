@@ -84,27 +84,41 @@ class Node:
                 return False
         return True
 
-    def equal(self, A, *reasons):
-        for reason in reasons:
-            assert reason.is_equal()
-            assert reason.is_proved()
-            if self.compare(reason.left()) and A.compare(reason.right()):
-                self.__prove()
-                return self
-            if self.compare(reason.right()) and A.compare(reason.left()):
-                self.__prove()
-                return self
-        if self.compare(A):
+    def __equal(self, reason, A, B):
+        if self.compare(reason):
             return True
+        if self.compare(A) and reason.compare(B):
+            return True
+        if self.compare(B) and reason.compare(A):
+            return True
+        if len(self) != len(reason):
+            return False
+        for index in range(0, len(self)):
+            if not self[index].__equal(reason[index], A, B):
+                return False
+        return True
+
+    def equal(self, *reasons):
+        if len(reasons) == 0:
+            assert self.is_equal()
+            assert self.left().compare(self.right())
+            self.__prove()
+            return self
+        elif len(reasons) == 1:
+            reason = reasons[0]
+            assert reason.is_proved()
+            assert self.compare(reason)
+            self.__prove()
+            return self
         else:
-            if self.__type != A.__type:
-                assert False
-            if self.__name != A.__name:
-                assert False
-            if len(self) != len(A):
-                assert False
-            for child_index in range(0, len(self)):
-                self[child_index].equal(A[child_index], *reasons)
+            assert len(reasons) == 2
+            reason = reasons[0]
+            assert reason.is_proved()
+            A_is_B = reasons[1]
+            assert A_is_B.is_proved()
+            A = A_is_B.left()
+            B = A_is_B.right()
+            assert self.__equal(reason, A, B)
             self.__prove()
             return self
 
@@ -677,5 +691,10 @@ def NoneNode(name):
 def remember(inference):
     inferences.append(inference)
 
-def escape():
-    return Node.last
+def escape(*arguments):
+    if not arguments:
+        return Node.last
+    else:
+        assert len(arguments) == 1
+        argument = arguments[0]
+        return Node.last.gen(argument)
