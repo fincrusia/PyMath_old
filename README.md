@@ -92,23 +92,23 @@ Unfortunately, there is no effective way to determine logically valid sentences.
 So you have to prove by steps, using the following APIs:
 
 
-1. *put()* : substitute a quantifier *all* by an instance.
+*put()* : substitute a quantifier *all* by an instance.
 
     All(x, x @ A).put(y)   # y @ A
 
-2. *assert_unique()* : from a proper sentence, drive uniqueness.
+*assert_unique()* : from a proper sentence, drive uniqueness.
 
     uniqueness = All(x, All(y, (P(x) & P(y) >> (x == y)))).assert_unique(z)   # Unique(z, P(z))
 
-3. *expand_unique()* : reverse *assert_unique*.
+*expand_unique()* : reverse *assert_unique*.
 
     a_is_b = Unique(c, Q(c)).expand_unique(a, b)   # a == b
 
-4. *found()* : from an instance, assert the     existence.
+*found()* : from an instance, assert the     existence.
 
     Exist(x, R(x)).found(R(a))   # Exist(x, R(x))
 
-5. *gen()* : generalization
+*gen()* : generalize by a variable
 
     S(x).gen(y)   # All(y, S(y))
 
