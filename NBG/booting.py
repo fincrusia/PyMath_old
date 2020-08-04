@@ -229,14 +229,14 @@ remember(property_of_complement)
 clean()
 from variables import *
 
-E = Membership_class()
-empty_class = E & ~E
+
+empty_class = A & ~A
 with x @ empty_class as xe:
-    xE = property_of_cap_left(x @ E, xe)
-    xE = (x @ E).by(xe)
-    xcE = (x @ ~E).by(xe)
-    nxE = (~(x @ E)).by(xcE)
-    false.by(xE, nxE)
+    xA = property_of_cap_left(x @ A, xe)
+    xA = (x @ A).by(xe)
+    xcA = (x @ ~A).by(xe)
+    nxA = (~(x @ A)).by(xcA)
+    false.by(xA, nxA)
 nxe = (~(x @ empty_class)).by(escape())
 nxe = (Set(x) >> nxe).by(nxe).gen(x)
 existence_of_empty_class = Exist(A, All(x, Set(x) >> ~(x @ A))).found(nxe)
@@ -249,7 +249,7 @@ def EmptyClass():
     return Node("function", "empty_class", [])
 
 
-# definition_of_ordered_pair
+# ordered_pair
 def OrderedPair(a, b):
     return Pairing(Pairing(a, a), Pairing(a, b))
 
