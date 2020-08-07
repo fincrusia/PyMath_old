@@ -250,6 +250,16 @@ def property_of_cap_right(target, x_in_A_cap_B):
 
 remember(property_of_cap_right)
 
+def property_of_cap(target, x_in_A, x_in_B):
+    x = x_in_A.left()
+    A = x_in_A.right()
+    B = x_in_B.right()
+    xs = Set(x).by(x_in_A)
+    definition_of_cap = theorems["definition_of_cap"].put(A).put(B).bput(x, xs)
+    return (x @ (A & B)).by(definition_of_cap, x_in_A, x_in_B)
+
+remember(property_of_cap)
+
 
 # complement_function
 clean()
@@ -296,10 +306,24 @@ existence_of_empty_class = Exist(A, All(x, Set(x) >> ~(x @ A))).found(nxe)
 uniqueness_of_empty_class = Unique(A, All(x, Set(x) >> ~(x @ A))).by()
 
 uniquely_exist = (existence_of_empty_class & uniqueness_of_empty_class).by(existence_of_empty_class, uniqueness_of_empty_class)
-definition_of_empty_class = uniquely_exist.define_function("empty_class").export("definition_of_empty_class")
+uniquely_exist.define_function("empty_class").export("definition_of_empty_class")
 
 def EmptyClass():
     return Node("function", "empty_class", [])
+
+
+def is_not_empty(target, x_in_A):
+    x = x_in_A.left()
+    A = x_in_A.right()
+    xs = Set(x).by(x_in_A)
+    definition = theorems["definition_of_empty_class"].bput(x, xs)
+    with A == EmptyClass() as Ae:
+        not_x_in_A = (~(x @ A)).by(definition, Ae)
+        false.by(not_x_in_A, x_in_A)
+    result = (A != EmptyClass()).by(escape())
+    return result
+
+remember(is_not_empty)
 
 
 # ordered_pair
@@ -682,3 +706,56 @@ with Set(x) as xs:
     escape(y)
 result = escape(x)
 Exist(B0, result.substitute(Variable("TL_9"), B0)).found(result).gen(A).export("tuple_lemma_4")
+
+
+# axiom of regularity
+clean()
+from variables import *
+
+All(a, Set(a) >> ((a != EmptyClass()) >> Exist(u, Set(u) & ((u @ a) & ((u & a) == EmptyClass()))))).axiom().export("axiom_of_regularity")
+
+
+# no Quine
+clean()
+from variables import *
+
+with x @ x as x_in_x:
+    xs = Set(x).by(x_in_x)
+    xx = Pairing(x, x)
+    xxs = Set(xx).by(xs, xs)
+    x_in_xx = (x @ xx).by(xs, xs)
+    xx_is_not_empty = (xx != EmptyClass()).by(x_in_xx)
+    regularity = theorems["axiom_of_regularity"].bput(xx, xxs)
+    regularity = regularity.right().by(regularity, xx_is_not_empty).let("nQ_0")
+    y = Variable("nQ_0")
+    ys = Set(y).by(regularity)
+    regularity = regularity.right().by(regularity)
+    y_in_xx = regularity.left().by(regularity)
+    y_cap_xx_is_empty = regularity.right().by(regularity)
+    y_is_x = (y == x).by(y_in_xx, xs)
+    x_cap_xx_is_empty = ((x & xx) == EmptyClass()).by(y_cap_xx_is_empty, y_is_x)
+    
+    x_in_xx = (x @ xx).by(xs, xs)
+    x_in_x_cap_xx = (x @ (x & xx)).by(x_in_xx, x_in_x)
+    x_cap_xx_is_not_empty = (~((x & xx) == EmptyClass())).by(x_in_x_cap_xx)
+
+    false.by(x_cap_xx_is_empty, x_cap_xx_is_not_empty)
+
+no_Quine = (~(x @ x)).by(escape()).gen(x)
+no_Quine.export("no_Quine")
+
+
+# expansion lemma
+
+
+
+
+
+
+
+
+
+
+
+
+
