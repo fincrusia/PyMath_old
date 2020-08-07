@@ -6,36 +6,6 @@ import pickle
 import atexit
 from itertools import permutations
 
-# load theorems
-theorems_file_name = "theorems.txt"
-theorems = {}
-try:
-    with open(theorems_file_name, "rb") as fp:
-        theorems = pickle.load(fp)
-except:
-    pass
-
-# load choices
-choices_file_name = "choice.txt"
-choices = []
-new_choices = []
-try:
-    with open(choices_file_name, "rb") as fp:
-        choices = pickle.load(fp)
-except:
-    pass
-
-def dump():
-    with open(theorems_file_name, "wb") as fp:
-        pickle.dump(theorems, fp)
-    with open(choices_file_name, "wb") as fp:
-        pickle.dump(new_choices, fp)
-
-atexit.register(dump)
-
-# inferences
-inferences = []
-
 # Node
 class Node:
     __cursor = -1
@@ -91,6 +61,10 @@ class Node:
             return True
         if self.compare(B) and reason.compare(A):
             return True
+        if self.__type != reason.__type:
+            return False
+        if self.__name != reason.__name:
+            return False
         if len(self) != len(reason):
             return False
         for index in range(0, len(self)):
@@ -450,7 +424,7 @@ class Node:
         sentence.__prove()
         return sentence
 
-    def bounded_put(self, term, bound):
+    def bput(self, term, bound):
         assert self.is_proved()
         assert bound.is_proved()
         variable = self.variable()
@@ -616,44 +590,77 @@ class Node:
         self.__prove()
         return self
 
-    __by_counter = -1
     __marked_indexes = set()
-    choices = None
-    __follow_history = True
+    choices = {}
     def by(self, *reasons):
-        Node.__by_counter += 1
-        if Node.__follow_history and Node.__by_counter < len(choices):
+        form = str(self)
+        for reason in reasons:
+            form += ("\\" + str(reason))
+        if Node.choices.get(form):
             try:
-                assert len(reasons) == len(choices[Node.__by_counter][1])
-                reasons_permuted = [reasons[choices[Node.__by_counter][1][x]] for x in range(0, len(reasons))]
-                inferences[choices[Node.__by_counter][0]](self, *reasons_permuted)
-                new_choices.append(choices[Node.__by_counter])
-                return self
+                index, permute = Node.choices[form]
+                assert len(reasons) == len(permute)
+                reasons_permuted = [reasons[permute[x]] for x in range(0, len(reasons))]
+                target = inferences[index](self, *reasons_permuted)
+                assert target.is_proved()
+                assert self.compare(target)
+                return target
             except:
-                Node.__follow_history = False
-        permute = list(permutations(range(0, len(reasons))))
-        for permutation_index in range(0, len(permute)):
+                del Node.choices[form]
+        permutations_list = list(permutations(range(0, len(reasons))))
+        for permute in permutations_list:
             for index, inference in enumerate(inferences):
                 if index in Node.__marked_indexes:
                     continue
                 try:
+                    reasons_permuted = [reasons[permute[x]] for x in range(0, len(reasons))]
                     Node.__marked_indexes.add(index)
-                    reasons_permuted = [reasons[permute[permutation_index][x]] for x in range(0, len(reasons))]
                     target = inference(self, *reasons_permuted)
                     assert target.is_proved()
                     assert self.compare(target)
-                    new_choices.append((index, permute[permutation_index]))
-                    Node.__marked_indexes.remove(index)
+                    if index in Node.__marked_indexes:
+                        Node.__marked_indexes.remove(index)
+                    Node.choices[form] = (index, permute)
                     return target
                 except:
                     if index in Node.__marked_indexes:
                         Node.__marked_indexes.remove(index)
-                    continue
         assert False
 
     def axiom(self):
         self.__prove()
         return self
+
+
+
+# load theorems
+theorems_file_name = "theorems.pickle"
+theorems = {}
+try:
+    with open(theorems_file_name, "rb") as fp:
+        theorems = pickle.load(fp)
+except:
+    theorems = {}
+
+# load choices
+choices_file_name = "choices.pickle"
+try:
+    with open(choices_file_name, "rb") as fp:
+        Node.choices = pickle.load(fp)
+except:
+    Node.choices = {}
+
+def dump():
+    with open(theorems_file_name, "wb") as fp:
+        pickle.dump(theorems, fp)
+    with open(choices_file_name, "wb") as fp:
+        pickle.dump(Node.choices, fp)
+
+atexit.register(dump)
+
+# inferences
+inferences = []
+
 
 def pre_unary(name, operator):
     Node.pre_unaries[name] = operator
@@ -698,3 +705,21 @@ def escape(*arguments):
         assert len(arguments) == 1
         argument = arguments[0]
         return Node.last.gen(argument)
+
+def composite_function(name, term, *arguments):
+    A = Variable("CF_0")
+    B = Variable("CF_1")
+    C = Variable("CF_2")
+    D = Variable("CF_3")
+    existence = Exist(C, C == term).found((term == term).by())
+    with A == term as At:
+        with B == term as Bt:
+            (A == B).by(At, Bt)
+    uniqueness = (((A == term) & (B == term)) >> (A == B)).by(escape())
+    uniqueness = uniqueness.gen(B).gen(A)
+    uniqueness = uniqueness.assert_unique(D)
+    uniquely_exist = (uniqueness & existence).by(uniqueness, existence)
+    for argument in reversed(arguments):
+        uniquely_exist = uniquely_exist.gen(argument)
+    definition = uniquely_exist.define_function(name)
+    return definition
