@@ -102,7 +102,7 @@ So you have to prove by steps, using the following APIs:
 
 *expand_unique()* : reverse *assert_unique*.
 
-    a_is_b = Unique(c, Q(c)).expand_unique(a, b)   # a == b
+    a_is_b = Unique(c, Q(c)).expand_unique(a, b)   # (Q(a) & Q(b)) >> a == b
 
 *found()* : from an instance, assert the     existence.
 
