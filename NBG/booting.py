@@ -279,14 +279,24 @@ definition_of_complement.export("definition_of_complement")
 def Complement(A):
     return Node("function", "complement", [A])
 
-def property_of_complement(target, x_in_cA):
+def property_of_complement_1(target, x_in_cA):
     x = x_in_cA.left()
     xs = Set(x).by(x_in_cA)
     A = x_in_cA.right().body()
     definition_of_complement = theorems["definition_of_complement"].put(A).bput(x, xs)
     return (~(x @ A)).by(definition_of_complement, x_in_cA)
 
-remember(property_of_complement)
+remember(property_of_complement_1)
+
+def property_of_complement_2(target, not_x_in_A, xs):
+    x = not_x_in_A.body().left()
+    A = not_x_in_A.body().right()
+    definition_of_complement = theorems["definition_of_complement"].put(A).bput(x, xs)
+    return (x @ ~A).by(definition_of_complement, not_x_in_A)
+
+remember(property_of_complement_2)
+
+
 
 # empty_class
 clean()
@@ -311,6 +321,50 @@ uniquely_exist.define_function("empty_class").export("definition_of_empty_class"
 def EmptyClass():
     return Node("function", "empty_class", [])
 
+
+# definition of V
+clean()
+from variables import *
+V0 = V
+V = ~EmptyClass()
+with Set(x) as xs:
+    definition_of_empty_class = theorems["definition_of_empty_class"].bput(x, xs)
+    (x @ V).by(definition_of_empty_class, xs)
+result = escape(x)
+
+existence = Exist(V0, All(x, Set(x) >> (x @ V0))).found(result)
+
+# cannot use by(), use the extensionality manually
+with All(x, Set(x) >> (x @ A)) as A_def:
+    with All(x, Set(x) >> (x @ B)) as B_def:
+        extensionality = theorems["axiom_of_extensionality"].put(A).put(B)
+        x0 = extensionality.get_all_variables()[0]
+        with Set(x0) as x0s:
+            x0A = A_def.bput(x0, x0s)
+            x0B = B_def.bput(x0, x0s)
+            x0A_x0B = ((x0 @ A) == (x0 @ B)).by(x0A, x0B)
+        result = escape(x0)
+        AB = (A == B).by(result, extensionality)
+    escape()
+result = escape()
+result = ((All(x, Set(x) >> (x @ A)) & All(x, Set(x) >> (x @ B))) >> (A == B)).by(result).gen(B).gen(A)
+uniqueness = result.assert_unique(V0)
+
+uniquely_exist = (existence & uniqueness).by(existence, uniqueness)
+uniquely_exist.define_function("class_V").export("definition_of_class_V")
+
+def ClassV():
+    return Node("function", "class_V", [])
+
+def set_in_V(target, xs):
+    x = xs.body()
+    return theorems["definition_of_class_V"].bput(x, xs)
+
+remember(set_in_V)
+
+
+clean()
+from variables import *
 
 def is_not_empty(target, x_in_A):
     x = x_in_A.left()
@@ -479,6 +533,39 @@ def Tuple(*arguments):
             node = OrderedPair2(node, argument)
         return node
 
+def tuple_is_set(target, x_is_tuple, *bounds):
+    x = x_is_tuple.left()
+    n = len(bounds)
+
+    variables = []
+    for bound in bounds:
+        variables.append(bound.body())
+
+    tt = variables[0]
+    tts = bounds[0]
+    for index in reversed(range(1, n)):
+        tts = Set(Tuple(tt, variables[index])).by(tts, bounds[index])
+        tt = Tuple(tt, variables[index])
+    return tts
+
+remember(tuple_is_set)
+
+def tuple_is_set_2(target, *bounds):
+    n = len(bounds)
+
+    variables = []
+    for bound in bounds:
+        variables.append(bound.body())
+
+    tt = variables[0]
+    tts = bounds[0]
+    for index in reversed(range(1, n)):
+        tts = Set(Tuple(tt, variables[index])).by(tts, bounds[index])
+        tt = Tuple(tt, variables[index])
+    return tts
+
+remember(tuple_is_set_2)
+
 def tuple_comparison(target, A_is_B, *bounds):
     arity = len(bounds) // 2
     A_node = A_is_B.left()
@@ -538,6 +625,180 @@ clean()
 from variables import *
 
 All(A, Exist(B, All(u, Set(u) >> ((u @ B) == Exist(x, Set(x) & (Exist(y, Set(y) & (u == Tuple(x, y))) & (x @ A))))))).axiom().export("product_by_V")
+
+existence_of_product_by_V = theorems["product_by_V"].put(A)
+uniqueness_of_product_by_V = uniqueness_from_extensionality(Unique(B, All(u, Set(u) >> ((u @ B) == Exist(x, Set(x) & (Exist(y, Set(y) & (u == Tuple(x, y))) & (x @ A)))))))
+
+uniquely_exist = (existence_of_product_by_V & uniqueness_of_product_by_V).by(existence_of_product_by_V, uniqueness_of_product_by_V)
+uniquely_exist = uniquely_exist.gen(A)
+uniquely_exist.define_function("product_by_V").export("definition_of_product_by_V")
+
+def ProductByV(A):
+    return Node("function", "product_by_V", [A])
+
+PV_counter_0 = 0
+def ProductV(target_variable, *exist_variables):
+    global PV_counter_0
+    PV_counter_0 += 1
+    PV_counter = PV_counter_0
+
+    product = ClassV()
+    n = len(exist_variables)
+    x = target_variable
+    z = exist_variables[-1]
+
+    if n == 1:
+        with x @ product as xp:
+            xs = Set(x).by(xp)
+            x_is_x = (x == x).by()
+            z_def = (Set(x) & x_is_x).by(xs, x_is_x)
+            z_def = Exist(z, Set(z) & (x == z)).found(z_def)
+        xp_imply_existence = escape()
+
+        with Exist(z, Set(z) & (x == z)) as existence:
+            existence = existence.let("PV_t_" + str(PV_counter))
+            t = Variable("PV_t_" + str(PV_counter))
+            ts = existence.left().by(existence)
+            x_is_t = existence.right().by(existence)
+
+            xs = Set(x).by(ts, x_is_t)
+            theorem = theorems["definition_of_class_V"].bput(x, xs)
+        existence_imply_xp = escape()
+
+        xp_iff_existence = (existence_imply_xp.right() == existence_imply_xp.left()).by(xp_imply_existence, existence_imply_xp)
+        result = (Set(x) >> xp_iff_existence).by(xp_iff_existence)
+        result = result.gen(x)
+        return result
+
+    elif n > 1:
+        for index in range(1, n):
+            product = ProductByV(product)
+        
+        u = Variable("PV_u")
+        theorem = theorems["definition_of_product_by_V"].put(product.body())
+        recursion = ProductV(u, *exist_variables[ : -1])
+
+        with x @ product as xp:
+            xs = Set(x).by(xp)
+            xp_iff = theorem.bput(x, xs)
+            xp_iff = xp_iff.right().by(xp, xp_iff).let("PV_s_" + str(PV_counter))
+            s = Variable("PV_s_" + str(PV_counter))
+            ss = Set(s).by(xp_iff)
+            xp_iff = xp_iff.right().by(xp_iff)
+
+            s_in_pp = xp_iff.right().by(xp_iff)
+            xp_iff = xp_iff.left().by(xp_iff)
+            xp_iff = xp_iff.let("PV_r_" + str(PV_counter))
+            r = Variable("PV_r_" + str(PV_counter))
+            rs = Set(r).by(xp_iff)
+            xp_iff = xp_iff.right().by(xp_iff)
+
+            recursion_2 = recursion.bput(s, ss)
+            recursion_2 = recursion_2.right().by(recursion_2, s_in_pp)
+            
+            bounds = []
+            tv_list = []
+            for index in range(1, n):
+                recursion_2 = recursion_2.let("PV_v_" + str(PV_counter) + "_" + str(index))
+                vi = Variable("PV_v_" + str(PV_counter) + "_" + str(index))
+                tv_list.append(vi)
+                bounds.append(recursion_2.left().by(recursion_2))
+                recursion_2 = recursion_2.right().by(recursion_2)
+
+            x_is_tuple = (x == Tuple(*tv_list, r)).by(recursion_2, xp_iff)
+            x_is_tuple = (rs & x_is_tuple).by(rs, x_is_tuple)
+
+            existence = Exist(z, x_is_tuple.substitute(r, z)).found(x_is_tuple)
+
+            for index in reversed(range(0, n - 1)):
+                existence = (bounds[index] & existence).by(bounds[index], existence)
+                existence = Exist(exist_variables[index], existence.substitute(tv_list[index], exist_variables[index])).found(existence)
+
+        xp_imply_existence = escape()
+
+        with xp_imply_existence.right() as existence:
+            existence_2 = existence
+            bounds = []
+            t = None
+            wi_list = []
+            for index in range(0, n):
+                existence_2 = existence_2.let("PV_w_" + str(PV_counter) + "_" + str(index))
+                if index == 0:
+                    wi_list.append(Variable("PV_w_" + str(PV_counter) + "_" + str(index)))
+                    t = Tuple(wi_list[-1])
+                else:
+                    wi_list.append(Variable("PV_w_" + str(PV_counter) + "_" + str(index)))
+                    t = Tuple(t, wi_list[-1])
+                bounds.append(existence_2.left().by(existence_2))
+                existence_2 = existence_2.right().by(existence_2)
+            ts = Set(t).by(existence_2, *bounds)
+            xs = Set(x).by(ts, existence_2)
+            
+            t = wi_list[0]
+            ts = bounds[0]
+            tp = ClassV()
+            ttp = (t @ tp).by(ts)
+            for index in range(1, n):
+                new_ts = Set(Tuple(t, wi_list[index])).by(ts, bounds[index])
+                theorem_3 = theorems["definition_of_product_by_V"].put(tp).bput(Tuple(t, wi_list[index]), new_ts)
+                x0, y0 = theorem_3.get_exist_variables()
+                t = Tuple(t, wi_list[index])
+                tp = ProductByV(tp)
+                t_is_t = (t == t).by()
+                bs_and_t_is_t = (bounds[index] & t_is_t).by(bounds[index], t_is_t)
+                y0_exist = Exist(y0, Set(y0) & ((t == Tuple(t[0], y0)))).found(bs_and_t_is_t)
+                y0_exist = (y0_exist & ttp).by(y0_exist, ttp)
+                y0_exist = (ts & y0_exist).by(ts, y0_exist)
+                x0_exist = theorem_3.right().found(y0_exist)
+                ttp = (t @ tp).by(theorem_3, x0_exist) # TODO
+                ts = new_ts
+            xp = (x @ product).by(ttp, existence_2)
+        existence_imply_xp = escape()
+
+        xp_iff_existence = (xp_imply_existence.left() == xp_imply_existence.right()).by(xp_imply_existence, existence_imply_xp)
+        xp_iff_existence = (Set(x) >> xp_iff_existence).by(xp_iff_existence)
+        return xp_iff_existence.gen(x)
+    else:
+        assert False
+
+def V_of(n):
+    if n == 1:
+        return ClassV()
+    else:
+        result = ClassV()
+        for _ in range(1, n):
+            result = ProductByV(result)
+    return result
+
+def tuple_in_product_V(tuple_in_product, *bounds):
+    t = tuple_in_product.left()
+
+    n = len(bounds)
+    ts = Set(t).by(*bounds)
+
+    variables = []
+    for bound in bounds:
+        variables.append(bound.body())
+
+    exist_variables = []
+    for variable in variables:
+        exist_variables.append(Variable("TIPV_" + str(variable)))
+
+    x = Variable("TIPV_0")
+    theorem = ProductV(x, *exist_variables).bput(t, ts)
+    
+    existence = (t == t).by()
+    for index in reversed(range(0, n)):
+        equality = (t == Tuple(*variables[ : index], *exist_variables[index : ]))
+        for index2 in reversed(range(index, n)):
+            equality = Exist(exist_variables[index2], Set(exist_variables[index2]) & equality)
+        existence = (bounds[index] & existence).by(bounds[index], existence)
+        existence = equality.found(existence)
+
+    result = tuple_in_product.by(theorem, existence)
+    return result
+
+remember(tuple_in_product_V)
 
 
 # circular permutation
@@ -745,16 +1006,176 @@ no_Quine = (~(x @ x)).by(escape()).gen(x)
 no_Quine.export("no_Quine")
 
 
+
 # expansion lemma
 
+EL_counter = 9
+def expansion_lemma(i, j, all_Rij, Rij, P, all_variables, variables, name):
+    global EL_counter
+    EL_counter += 1
+
+    xi = variables[i]
+    xj = variables[j]
+    n = len(variables)
+
+    Rij_in_P_gen = (all_Rij == (Tuple(all_variables[i], all_variables[j]) @ P))
+    for all_variable in reversed(all_variables):
+        Rij_in_P_gen = All(all_variable, Set(all_variable) >> Rij_in_P_gen)
+
+    x = Variable("EL_3")
+    Vn = V_of(n)
+    PV = ProductV(x, *variables)
+    
+    with Rij_in_P_gen as Rij_in_P_gen:
+
+        bounds = []
+        for variable in variables:
+            bounds.append(Set(variable).__enter__())
 
 
+        Rij_in_P = Rij_in_P_gen
+        for index in range(0, n):
+            Rij_in_P = Rij_in_P.bput(variables[index], bounds[index])
+
+        z = Tuple(*variables[ : i])
+        zs = Set(z).by(*bounds[ : i])
+
+        w = Tuple(*variables[ : j])
+        ws = Set(w).by(*bounds[ : j])
+
+        P1 = None
+        Rij_in_P1 = None
+        if i == 0:
+            P1 = P
+            Rij_in_P1 = Rij_in_P
+        else:
+            tuple_lemma_1 = theorems["tuple_lemma_1"].put(P).let(name + "_EL_0")
+            P1 = Variable(name + "_EL_0")
+            tuple_lemma_1 = tuple_lemma_1.bput(xi, bounds[i]).bput(xj, bounds[j]).bput(z, zs)
+            Rij_in_P1 = (Rij == (Tuple(z, xi, xj) @ P1)).by(tuple_lemma_1, Rij_in_P)
+
+        P2 = None
+        Rij_in_P2 = None
+        if j == i + 1:
+            P2 = P1
+            Rij_in_P2 = Rij_in_P1
+        else:
+            index = i
+            for variable in variables[i + 1 : j]:
+                index += 1
+
+                z0 = z
+                z = Tuple(*variables[ : index])
+                zs = Set(z).by(zs, bounds[index - 1])
+
+                tuple_lemma_2 = theorems["tuple_lemma_2"].put(P1).let(name + "_EL_1" + "_" + str(index))
+                P2 = Variable(name + "_EL_1" + "_" + str(index))
+                tuple_lemma_2 = tuple_lemma_2.bput(z, zs).bput(xj, bounds[j]).bput(variable, bounds[index])
+                Rij_in_P2 = (Rij == (Tuple(z0, xi, *variables[i + 1 : index + 1], xj) @ P2)).by(tuple_lemma_2, Rij_in_P1)
+
+        P3 = None
+        Rij_in_P3 = None
+        if j == len(variables) - 1:
+            P3 = P2
+            Rij_in_P3 = Rij_in_P2
+        else:
+            index = j
+            for variable in variables[j + 1 : len(variables)]:
+                index += 1
+                tuple_lemma_3 = theorems["tuple_lemma_3"].put(P2).let(name + "_EL_2" + "_" + str(index))
+                P3 = Variable(name + "_EL_2" + "_" + str(index))
+                tuple_lemma_3 = tuple_lemma_3.bput(w, ws).bput(xj, bounds[j]).bput(variable, bounds[index])
+                Rij_in_P3 = (Rij == (Tuple(*variables[0 : index + 1]) @ P3)).by(tuple_lemma_3, Rij_in_P2)
+        
+        tuple_in_product_V((Tuple(*variables) @ Vn), *bounds)
+        tuple_in_product = (Tuple(*variables) @ Vn).by(*bounds)
+
+        Q = P3 & Vn
+        with Rij as R:
+            in_P3 = Rij_in_P3.right().by(R, Rij_in_P3)
+            (Tuple(*variables) @ Q).by(tuple_in_product, in_P3)
+        Rij_imply_tQ = escape()
+
+        t = Tuple(*variables)
+        with t @ Q as tQ:
+            tP3 = (t @ P3).by(tQ)
+            Rij = Rij.by(Rij_in_P3, tP3)
+        tQ_imply_Rij = escape()
+        (Rij_imply_tQ.left() == Rij_imply_tQ.right()).by(tQ_imply_Rij, Rij_imply_tQ)
 
 
+        result = None
+        for variable in reversed(variables):
+            Set(variable).__exit__(None, None, None)
+            result = escape(variable)
 
+        with x @ Q as xQ:
+            xVn = (x @ Vn).by(xQ)
+            xs = Set(x).by(xQ)
+            PV = PV.bput(x, xs)
+            PV = PV.right().by(PV, xVn)
+        
+            let_variables = []
+            let_bounds = []
+            for variable in variables:
+                PV = PV.let("EL_let_" + str(variable))
+                let_bounds.append(PV.left().by(PV))
+                PV = PV.right().by(PV)
+                let_variables.append(Variable("EL_let_" + str(variable)))
 
+            result2 = result
+            for index in range(0, n):
+                result2 = result2.bput(let_variables[index], let_bounds[index])
 
+            tQ = result2.right().by(PV, xQ)
+            let_Rij = result2.left().by(tQ, result2)
 
+            PV_and_let_Rij = (PV & let_Rij).by(PV, let_Rij)
+            for index in reversed(range(0, n)):
+                PV_and_let_Rij = (let_bounds[index] & PV_and_let_Rij).by(let_bounds[index], PV_and_let_Rij)
+                PV_and_let_Rij = Exist(variables[index], PV_and_let_Rij.substitute(let_variables[index], variables[index])).found(PV_and_let_Rij)
+        xQ_imply_Rij = escape()
+
+        with xQ_imply_Rij.right() as PV_and_Rij:
+            
+            let_variables = []
+            let_bounds = []
+            for variable in variables:
+                PV_and_Rij = PV_and_Rij.let("EL_let_2_" + str(variable))
+                let_bounds.append(PV_and_Rij.left().by(PV_and_Rij))
+                PV_and_Rij = PV_and_Rij.right().by(PV_and_Rij)
+                let_variables.append(Variable("EL_let_2_" + str(variable)))
+                
+            xt = PV_and_Rij.left().by(PV_and_Rij)
+            Rij = PV_and_Rij.right().by(PV_and_Rij)
+
+            for index in range(0, n):
+                result = result.bput(let_variables[index], let_bounds[index])
+            result = result.right().by(result, Rij)
+
+            xQ = (x @ Q).by(result, xt)
+        Rij_imply_xQ = escape()
+
+        xQ_iff_Rij = (xQ_imply_Rij.left() == xQ_imply_Rij.right()).by(xQ_imply_Rij, Rij_imply_xQ)
+        xQ_iff_Rij = (Set(x) >> xQ_iff_Rij).by(xQ_iff_Rij).gen(x)
+
+        Q0 = Variable("EL_4")
+        existence = Exist(Q0, xQ_iff_Rij.contract(Q, Q0)).found(xQ_iff_Rij)
+        uniqueness_from_extensionality(Unique(Q0, xQ_iff_Rij.contract(Q, Q0)))
+        uniqueness = Unique(Q0, xQ_iff_Rij.contract(Q, Q0)).by()
+        (existence & uniqueness).by(existence, uniqueness)
+
+    result = escape()
+    return result
+            
+
+'''
+clean()
+from variables import *
+
+result = expansion_lemma(1, 3, q @ s, b @ d, P, [p, q, r, s, t], [a, b, c, d, e], "hello")
+print(result)
+'''
 
 
 

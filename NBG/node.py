@@ -25,6 +25,8 @@ class Node:
     post_unaries = {}
     associatives = {}
 
+    definitions = {}
+
     # basic
     def __init__(self, type_, name, children):
         if type_ == "logical":
@@ -334,8 +336,8 @@ class Node:
 
     def __contract(self, term, variable):
         if self.compare(term):
-            return variable.copy()
-        elif self.is_quantifier and self.variable().__name in term.get_free_names():
+            return variable
+        elif self.is_quantifier() and self.variable().__name in term.get_free_names():
             assert False # for readability
         else:
             children = [child.__contract(term, variable) for child in self.__children]
@@ -410,6 +412,7 @@ class Node:
     
     def export(self, name):
         assert self.is_proved()
+        assert not self.__branch
         assert self.is_closed()
         theorems[name] = self
         #print(self) # verbose
@@ -493,6 +496,7 @@ class Node:
             else:
                 definition = All(arguments[index], bounds[index] >> definition)
         definition.__prove()
+        Node.definitions[name] = definition
         return definition
 
     __let_counter = 0
@@ -500,6 +504,7 @@ class Node:
         assert self.is_quantifier() and self.__name == "exist"
         exist_variable = self.variable()
         Node.__let_counter += 1
+        assert not name in Node.__names
         let_variable = Variable(name)
         statement = self.statement().substitute(exist_variable, let_variable)
         statement.__prove()
@@ -556,6 +561,7 @@ class Node:
         for free_variable in reversed(free_variables):
             definition = All(free_variable, definition)
         definition.__prove()
+        Node.definitions[name] = definition
         return definition
 
     def logic(self, *reasons):
