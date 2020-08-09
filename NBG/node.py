@@ -482,11 +482,6 @@ class Node:
         while cursor.is_quantifier() and cursor.__name == "all":
             arguments.append(cursor.variable())
             cursor = cursor.statement()
-            if cursor.is_logical() and cursor.__name == "imply":
-                bounds.append(cursor.left())
-                cursor = cursor.right()
-            else:
-                bounds.append(NoneNode("DF"))
         
         assert cursor.is_logical() and cursor.__name == "and"
         left = cursor.left()
@@ -506,19 +501,13 @@ class Node:
         uniqueness = All(DF, definition.contract(new_term, DF) >> (DF == new_term))
         
         for index in reversed(range(0, len(arguments))):
-            if bounds[index] == NoneNode("DF"):
-                uniqueness = All(arguments[index], uniqueness)
-            else:
-                uniqueness = All(arguments[index], bounds[index] >> uniqueness)
+            uniqueness = All(arguments[index], uniqueness)
         uniqueness.__prove()
 
         Node.function_uniqueness[name] = uniqueness
 
         for index in reversed(range(0, len(arguments))):
-            if bounds[index] == NoneNode("DF"):
-                definition = All(arguments[index], definition)
-            else:
-                definition = All(arguments[index], bounds[index] >> definition)
+            definition = All(arguments[index], definition)
         definition.__prove()
         Node.definitions[name] = definition
 

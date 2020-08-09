@@ -181,16 +181,66 @@ from variables import *
 
 axiom_of_pairing = All(x, Set(x) >> All(y, Set(y) >> Exist(p, Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))))
 axiom_of_pairing.axiom().export("axiom_of_pairing")
+
+def Anywhere(*arguments):
+    return Node("function", "anywhere", arguments)
+
+p_def = ((Set(x) & Set(y)) >> (Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))) & (~(Set(x) & Set(y)) >> (p == Anywhere(x, y)))
 with Set(x) as xs:
     with Set(y) as ys:
-        exist_p = axiom_of_pairing.bput(x, xs).bput(y, ys)
-        unique_p = Unique(p, Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))
-        unique_p = unique_p.by()
-        (unique_p & exist_p).by(unique_p, exist_p)
-    escape().gen(y)
-uniquely_exist = escape().gen(x)
+        aop = theorems["axiom_of_pairing"].bput(x, xs).bput(y, ys)
+        aop_let = aop.let("pairing_definition_temporary")
+        let_var = Variable("pairing_definition_temporary")
+        aop_let = p_def.substitute(p, let_var).by(xs, ys, aop_let)
+        Exist(p, p_def).found(aop_let)
+    escape()
+xys_case = escape()
 
-uniquely_exist.define_function("pairing").export("definition_of_pairing")
+with ~(Set(x) & Set(y)) as nxys:
+    p_is_p = (Anywhere(x, y) == Anywhere(x, y)).by()
+    p_def_0 = (((Set(x) & Set(y)) >> (Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))) & (~(Set(x) & Set(y)) >> (Anywhere(x, y) == Anywhere(x, y)))).by(p_is_p, nxys)
+    Exist(p, p_def).found(p_def_0)
+nxys_case = escape()
+
+existence = Exist(p, p_def).by(xys_case, nxys_case)
+a_def = p_def.substitute(p, a)
+b_def = p_def.substitute(p, b)
+
+with a_def as a_def:
+    with b_def as b_def:
+        with (Set(x) & Set(y)) as xys:
+            a_def_left = a_def.left().right().right().by(xys, a_def)
+            b_def_left = b_def.left().right().right().by(xys, b_def)
+            with Set(z) as zs:
+                a_def_left = a_def_left.bput(z, zs)
+                b_def_left = b_def_left.bput(z, zs)
+                za_iff_zb = ((z @ a) == (z @ b)).by(a_def_left, b_def_left)
+            za_iff_zb = escape(z)
+            extensionality = theorems["axiom_of_extensionality"].put(a).put(b)
+            x0 = extensionality.get_all_variables()[0]
+            x0a_iff_x0b = za_iff_zb.put(x0).gen(x0)
+            a_is_b = (a == b).by(x0a_iff_x0b, extensionality)
+        xys_case = escape()
+        with ~(Set(x) & Set(y)) as nxys:
+            a_is_any = (a == Anywhere(x, y)).by(a_def, nxys)
+            b_is_any = (b == Anywhere(x, y)).by(b_def, nxys)
+            a_is_b = (a == b).by(a_is_any, b_is_any)
+        nxys_case = escape()
+        a_is_b = (a == b).by(xys_case, nxys_case)
+    escape()
+uniqueness = ((a_def & b_def) >> (a == b)).by(escape()).gen(b).gen(a).assert_unique(c)
+
+uniquely_exist = (uniqueness & existence).by(uniqueness, existence).gen(y).gen(x)
+definition_of_pairing = uniquely_exist.define_function("pairing")
+
+definition_of_pairing = definition_of_pairing.put(x).put(y)
+definition_of_pairing = definition_of_pairing.left().by(definition_of_pairing)
+with Set(x) as xs:
+    with Set(y) as ys:
+        definition_of_pairing = definition_of_pairing.right().by(xs, ys, definition_of_pairing)
+    escape(y)
+definition_of_pairing = escape(x).export("definition_of_pairing")
+
 
 def Pairing(a, b):
     return Node("function", "pairing", [a, b])
@@ -1542,16 +1592,6 @@ def sentence_transformation(sentence, variables):
     else:
         assert False
 
-
-
-clean()
-from variables import *
-
-sentence, equivalence, variables = sentence_transformation(((Set(x) >> (x @ y)) & (Tuple(z, z) == x)), [x, z])
-print(sentence)
-print(equivalence)
-for variable in variables:
-    print(variable)
 
 
 
