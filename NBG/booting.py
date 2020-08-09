@@ -1263,14 +1263,6 @@ def expansion_lemma(i, j, all_Rij, Rij, P, all_variables, variables, name):
     return result
 
 
-'''
-clean()
-from variables import *
-
-result = expansion_lemma(1, 3, q @ s, b @ d, P, [p, q, r, s, t], [a, b, c, d, e], "hello")
-print(result)
-'''
-
 GEWDBQ_counter = 0
 def get_equivalence_when_differ_by_quantifiers(target, source):
     global GEWDBQ_counter
@@ -1288,9 +1280,9 @@ def get_equivalence_when_differ_by_quantifiers(target, source):
                 source_put.gen(source_var)
             target_to_source = escape()
 
-            with source as source:
-                source_put = source.put(x)
-                target_put = target.substitute(target_var, x)
+            with All(source_var, source.statement()) as source_copy: # copy for branch conservation
+                source_put = source_copy.put(x)
+                target_put = target.statement().substitute(target_var, x)
                 put_equivalence = get_equivalence_when_differ_by_quantifiers(source_put, target_put)
                 target_put = target_put.by(source_put, put_equivalence)
                 target_put.gen(target_var)
@@ -1308,8 +1300,8 @@ def get_equivalence_when_differ_by_quantifiers(target, source):
                 Exist(source_var, source.statement()).found(source_let) # copy for branch conservation
             target_to_source = escape()
 
-            with Exist(source_var, source.statement()) as source: # copy for branch conservation
-                source_let = source.let("GEWDBQ_source_let_" + str(GEWDBQ_counter))
+            with Exist(source_var, source.statement()) as source_copy: # copy for branch conservation
+                source_let = source_copy.let("GEWDBQ_source_let_" + str(GEWDBQ_counter))
                 x = Variable("GEWDBQ_source_let_" + str(GEWDBQ_counter))
                 target_let = target.statement().substitute(target_var, x)
                 let_equivalence = get_equivalence_when_differ_by_quantifiers(source_let, target_let)
@@ -1322,6 +1314,7 @@ def get_equivalence_when_differ_by_quantifiers(target, source):
         else:
             assert False
     elif target.is_logical():
+        assert target.get_name() == source.get_name()
         if target.get_name() in ["and", "or", "imply", "iff"]:
             left_equivalence = get_equivalence_when_differ_by_quantifiers(target.left(), source.left())
             right_equivalence = get_equivalence_when_differ_by_quantifiers(target.right(), source.right())
@@ -1387,10 +1380,10 @@ def sentence_transformation(sentence, variables):
             element = sentence.left()
             class_ = sentence.right()
 
-            if element.is_variable() and class_.is_variable():
+            if (element.is_variable() or element.get_name() == "anywhere") and (class_.is_variable() or class_.get_name() == "anywhere"):
                 return sentence, (sentence == sentence).by(), variables
 
-            elif element.is_function() and class_.is_variable():
+            elif (element.is_function() and element.get_name() != "anywhere") and (class_.is_variable() or class_.get_name() == "anywhere"):
                 A = Variable("ST_4_" + str(ST_counter))
                 element_definition = get_definition(element.get_name())
                 for index in range(0, len(element)):
@@ -1417,7 +1410,7 @@ def sentence_transformation(sentence, variables):
                 s_iff_s0 = (s0_imply_s.left() == s0_imply_s.right()).by(s0_imply_s, s_imply_s0)
                 return sentence_0, s_iff_s0, variables
 
-            elif element.is_variable() and class_.is_function():
+            elif (element.is_variable() or element.get_name() == "anywhere") and (class_.is_function() and class_.get_name() != "anywhere"):
                 B = Variable("ST_5_" + str(ST_counter))
 
                 class_definition = get_definition(class_.get_name())
@@ -1446,7 +1439,7 @@ def sentence_transformation(sentence, variables):
                 s_iff_s0 = (s0_imply_s.left() == s0_imply_s.right()).by(s0_imply_s, s_imply_s0)
                 return sentence_0, s_iff_s0, variables
 
-            elif element.is_function() and class_.is_function():
+            else:
                 A = Variable("ST_4_" + str(ST_counter))
                 B = Variable("ST_5_" + str(ST_counter))
 
@@ -1487,8 +1480,6 @@ def sentence_transformation(sentence, variables):
                 s_iff_s0 = (s0_imply_s.left() == s0_imply_s.right()).by(s0_imply_s, s_imply_s0)
                 return sentence_0, s_iff_s0, variables
 
-            else:
-                assert False
 
 
         elif sentence.get_name() == "equal":
@@ -1593,6 +1584,5 @@ def sentence_transformation(sentence, variables):
         assert False
 
 
-
-
-
+clean()
+from variables import *
