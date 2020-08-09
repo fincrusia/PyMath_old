@@ -1583,6 +1583,3 @@ def sentence_transformation(sentence, variables):
     else:
         assert False
 
-
-clean()
-from variables import *
