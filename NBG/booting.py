@@ -53,6 +53,17 @@ def reflection_of_non_equality(target, A_is_not_B):
 
 remember(reflection_of_non_equality)
 
+# negate_quantifier
+def negate_exist(target, self):
+    return self.not_exist_to_all_not()
+
+remember(negate_exist)
+
+def negate_all(target, self):
+    return self.not_all_to_exist_not()
+
+remember(negate_all)
+
 # definition of set
 clean()
 from variables import *
@@ -81,6 +92,38 @@ from variables import *
 
 All(A, All(B, All(x, Set(x) >> ((x @ A) == (x @ B))) >> (A == B))).axiom().export("axiom_of_extensionality")
 
+
+clean()
+from variables import *
+
+
+x0 = theorems["axiom_of_extensionality"].get_all_variables()[2]
+with A == B as AB:
+    with Set(x) as xs:
+        with x @ A as xA:
+            xB = (x @ B).by(xA, AB)
+        xA_imply_xB = escape()
+        with x @ B as xB:
+            xA = (x @ A).by(xB, AB)
+        xB_imply_xA = escape()
+        ((x @ A) == (x @ B)).by(xA_imply_xB, xB_imply_xA)
+    escape(x)
+converse = escape()
+
+extensionality = theorems["axiom_of_extensionality"].put(A).put(B)
+with All(x, Set(x) >> ((x @ A) == (x @ B))) as ea:
+    with Set(x0) as x0s:
+        ea0 = ea.bput(x0, x0s)
+    escape(x0)
+x_imply_x0 = escape()
+with All(x0, Set(x0) >> ((x0 @ A) == (x0 @ B))) as ea0:
+    with Set(x) as xs:
+        ea = ea0.bput(x, xs)
+    escape(x)
+x0_imply_x = escape()
+extensionality = (converse.right() == converse.left()).by(extensionality, converse, x_imply_x0, x0_imply_x).gen(B).gen(A).export("axiom_of_extensionality_2")
+
+
 def uniqueness_from_extensionality(target):
     # target : Unique(A, bound & All(x, Set(x) >> ((x @ A) == condition)))
     A = target.variable()
@@ -107,10 +150,11 @@ def uniqueness_from_extensionality(target):
                 xB_xC = escape()
                 all_xs_xB_xC = xB_xC.gen(x0)
                 (B == C).by(all_xs_xB_xC, extensionality)
-        
+            escape()
         result = escape()
-        result = ((result.left() & result.right().left()) >> (B == C)).by(escape()).gen(C).gen(B)
+        result = ((result.left() & result.right().left()) >> (B == C)).by(result).gen(C).gen(B)
         
+
         return result.assert_unique(A)
     else:
         with target_B as bounded_target_B:
@@ -122,9 +166,9 @@ def uniqueness_from_extensionality(target):
                 xB_xC = escape()
                 all_xs_xB_xC = xB_xC.gen(x0)
                 (B == C).by(all_xs_xB_xC, extensionality)
-        
+            escape()
         result = escape()
-        result = ((result.left() & result.right().left()) >> (B == C)).by(escape()).gen(C).gen(B)
+        result = ((result.left() & result.right().left()) >> (B == C)).by(result).gen(C).gen(B)
         
         return result.assert_unique(A)
 
@@ -534,7 +578,6 @@ def Tuple(*arguments):
         return node
 
 def tuple_is_set(target, x_is_tuple, *bounds):
-    x = x_is_tuple.left()
     n = len(bounds)
 
     variables = []
@@ -861,6 +904,7 @@ with Set(x) as xs:
     escape(y)
 result = escape(x)
 result = Exist(B0, result.substitute(B, B0)).found(result)
+result.gen(A).export("tuple_lemma_3")
 
 clean()
 from variables import *
@@ -1167,7 +1211,7 @@ def expansion_lemma(i, j, all_Rij, Rij, P, all_variables, variables, name):
 
     result = escape()
     return result
-            
+
 
 '''
 clean()
@@ -1176,6 +1220,338 @@ from variables import *
 result = expansion_lemma(1, 3, q @ s, b @ d, P, [p, q, r, s, t], [a, b, c, d, e], "hello")
 print(result)
 '''
+
+GEWDBQ_counter = 0
+def get_equivalence_when_differ_by_quantifiers(target, source):
+    global GEWDBQ_counter
+    GEWDBQ_counter += 1
+    if target.is_quantifier():
+        target_var = target.variable()
+        source_var = source.variable()
+        if target.get_name() == "all":
+            x = Variable("GEWDBQ_put_" + str(GEWDBQ_counter))
+            with target as target:
+                target_put = target.put(x)
+                source_put = source.statement().substitute(source_var, x)
+                put_equivalence = get_equivalence_when_differ_by_quantifiers(target_put, source_put)
+                source_put = source_put.by(target_put, put_equivalence)
+                source_put.gen(source_var)
+            target_to_source = escape()
+
+            with source as source:
+                source_put = source.put(x)
+                target_put = target.substitute(target_var, x)
+                put_equivalence = get_equivalence_when_differ_by_quantifiers(source_put, target_put)
+                target_put = target_put.by(source_put, put_equivalence)
+                target_put.gen(target_var)
+            source_to_target = escape()
+
+            return (target == source).by(target_to_source, source_to_target)
+
+        elif target.get_name() == "exist":
+            with target as target:
+                target_let = target.let("GEWDBQ_target_let_" + str(GEWDBQ_counter))
+                x = Variable("GEWDBQ_target_let_" + str(GEWDBQ_counter))
+                source_let = source.statement().substitute(source_var, x)
+                let_equivalence = get_equivalence_when_differ_by_quantifiers(target_let, source_let)
+                source_let = source_let.by(target_let, let_equivalence)
+                Exist(source_var, source.statement()).found(source_let) # copy for branch conservation
+            target_to_source = escape()
+
+            with Exist(source_var, source.statement()) as source: # copy for branch conservation
+                source_let = source.let("GEWDBQ_source_let_" + str(GEWDBQ_counter))
+                x = Variable("GEWDBQ_source_let_" + str(GEWDBQ_counter))
+                target_let = target.statement().substitute(target_var, x)
+                let_equivalence = get_equivalence_when_differ_by_quantifiers(source_let, target_let)
+                target_let = target_let.by(source_let, let_equivalence)
+                target.found(target_let)
+            source_to_target = escape()
+
+            return (target == source).by(target_to_source, source_to_target)
+            
+        else:
+            assert False
+    elif target.is_logical():
+        if target.get_name() in ["and", "or", "imply", "iff"]:
+            left_equivalence = get_equivalence_when_differ_by_quantifiers(target.left(), source.left())
+            right_equivalence = get_equivalence_when_differ_by_quantifiers(target.right(), source.right())
+            return (target == source).by(left_equivalence, right_equivalence)
+        elif target.get_name() == "not":
+            body_equivalence = get_equivalence_when_differ_by_quantifiers(target.body(), source.body())
+            return (target == source).by(body_equivalence)
+        else:
+            assert False
+    elif target.is_property():
+        return (source == source).by()
+    else:
+        assert False
+
+
+def differ_by_quantifiers(target, source):
+    equivalence = get_equivalence_when_differ_by_quantifiers(target, source)
+    return target.by(source, equivalence)
+
+remember(differ_by_quantifiers)
+
+
+ST_counter = 0
+def sentence_transformation(sentence, variables):
+    global ST_counter
+    ST_counter += 1
+    if sentence.is_logical():
+        if sentence.get_name() == "and":
+            sentence_0, equivalence_0, variables = sentence_transformation(sentence.left(), variables)
+            sentence_1, equivalence_1, variables = sentence_transformation(sentence.right(), variables)
+            sentence_and = sentence_0 & sentence_1
+            equivalence_and = (sentence == sentence_and).by(equivalence_0, equivalence_1)
+            return sentence_and, equivalence_and, variables
+        elif sentence.get_name() == "or":
+            sentence_0, equivalence_0, variables = sentence_transformation(sentence.left(), variables)
+            sentence_1, equivalence_1, variables = sentence_transformation(sentence.right(), variables)
+            sentence_or = ~(~sentence_0 | sentence_1)
+            equivalence_or = (sentence == sentence_or).by(equivalence_0, equivalence_1)
+            return sentence_or, equivalence_or, variables
+        elif sentence.get_name() == "imply":
+            sentence_0, equivalence_0, variables = sentence_transformation(sentence.left(), variables)
+            sentence_1, equivalence_1, variables = sentence_transformation(sentence.right(), variables)
+            sentence_imply = (~sentence_0) | sentence_1
+            equivalence_imply = (sentence == sentence_imply).by(equivalence_0, equivalence_1)
+            return sentence_imply, equivalence_imply, variables
+        elif sentence.get_name() == "iff":
+            sentence_0, equivalence_0, variables = sentence_transformation(sentence.left(), variables)
+            sentence_1, equivalence_1, variables = sentence_transformation(sentence.right(), variables)
+            sentence_iff = (~((~sentence_0) & sentence_1)) & ~(sentence_0 & ~sentence_1)
+            equivalence_iff = (sentence == sentence_iff).by(equivalence_0, equivalence_1)
+            return sentence_iff, equivalence_iff, variables
+        elif sentence.get_name() == "not":
+            sentence_0, equivalence_0, variables = sentence_transformation(sentence.body(), variables)
+            sentence_not = ~sentence_0
+            equivalence_not = (sentence == sentence_not).by(equivalence_0)
+            return sentence_not, equivalence_not, variables
+        elif sentence.get_name() in ["true", "false"]:
+            return sentence, (sentence == sentence).by(), variables
+        else:
+            assert False
+    elif sentence.is_property():
+        if sentence.get_name() == "in":
+            element = sentence.left()
+            class_ = sentence.right()
+
+            if element.is_variable() and class_.is_variable():
+                return sentence, (sentence == sentence).by(), variables
+
+            elif element.is_function() and class_.is_variable():
+                A = Variable("ST_4_" + str(ST_counter))
+                element_definition = get_definition(element.get_name())
+                for index in range(0, len(element)):
+                    element_definition = element_definition.put(element[index])
+                sentence_0 = Exist(A, element_definition.contract(element, A) & (A @ class_))
+
+                element_uniqueness = get_uniqueness(element.get_name())
+                for index in range(0, len(element)):
+                    element_uniqueness = element_uniqueness.put(element[index])
+
+                with sentence_0 as s0:
+                    s0_let = s0.let("ST_8_" + str(ST_counter))
+                    A_let = Variable("ST_8_" + str(ST_counter))
+                    A_let_def = s0_let.left().by(s0_let)
+                    element_is_A_let = (A_let == element).by(element_uniqueness.put(A_let), A_let_def)
+                    (element @ class_).by(s0_let.right().by(s0_let), element_is_A_let)
+                s0_imply_s = escape()
+
+                with sentence as s:
+                    def_and_s = (element_definition & s).by(element_definition, s)
+                    sentence_0.found(def_and_s)
+                s_imply_s0 = escape()
+                
+                s_iff_s0 = (s0_imply_s.left() == s0_imply_s.right()).by(s0_imply_s, s_imply_s0)
+                return sentence_0, s_iff_s0, variables
+
+            elif element.is_variable() and class_.is_function():
+                B = Variable("ST_5_" + str(ST_counter))
+
+                class_definition = get_definition(class_.get_name())
+                for index in range(0, len(class_)):
+                    class_definition = class_definition.put(class_[index])
+                sentence_0 = Exist(B, class_definition.contract(class_, B) & (element @ B))
+
+
+                class_uniqueness = get_uniqueness(class_.get_name())
+                for index in range(0, len(class_)):
+                    class_uniqueness = class_uniqueness.put(class_[index])
+
+                with sentence_0 as s0:
+                    s0_let = s0.let("ST_9_" + str(ST_counter))
+                    B_let = Variable("ST_9_" + str(ST_counter))
+                    B_let_def = s0_let.left().by(s0_let)
+                    class_is_B_let = (B_let == class_).by(class_uniqueness.put(B_let), B_let_def)
+                    (element @ class_).by(s0_let.right().by(s0_let), class_is_B_let)
+                s0_imply_s = escape()
+
+                with sentence as s:
+                    def_and_s = (class_definition & s).by(class_definition, s)
+                    sentence_0.found(def_and_s)
+                s_imply_s0 = escape()
+
+                s_iff_s0 = (s0_imply_s.left() == s0_imply_s.right()).by(s0_imply_s, s_imply_s0)
+                return sentence_0, s_iff_s0, variables
+
+            elif element.is_function() and class_.is_function():
+                A = Variable("ST_4_" + str(ST_counter))
+                B = Variable("ST_5_" + str(ST_counter))
+
+                element_definition = get_definition(element.get_name())
+                for index in range(0, len(element)):
+                    element_definition = element_definition.put(element[index])
+                class_definition = get_definition(class_.get_name())
+                for index in range(0, len(class_)):
+                    class_definition = class_definition.put(class_[index])
+                
+                sentence_0 = Exist(A, (Exist(B, (element_definition.contract(element, A) & class_definition.contract(class_, B)) & (A @ B))))
+
+                element_uniqueness = get_uniqueness(element.get_name())
+                for index in range(0, len(element)):
+                    element_uniqueness = element_uniqueness.put(element[index])
+                class_uniqueness = get_uniqueness(class_.get_name())
+                for index in range(0, len(class_)):
+                    class_uniqueness = class_uniqueness.put(class_[index])
+
+                with sentence_0 as s0:
+                    s0_let = s0.let("ST_8_" + str(ST_counter)).let("ST_9_" + str(ST_counter))
+                    A_let = Variable("ST_8_" + str(ST_counter))
+                    B_let = Variable("ST_9_" + str(ST_counter))
+                    A_let_def = s0_let.left().left().by(s0_let)
+                    B_let_def = s0_let.left().right().by(s0_let)
+                    element_is_A_let = (A_let == element).by(element_uniqueness.put(A_let), A_let_def)
+                    class_is_B_let = (B_let == class_).by(class_uniqueness.put(B_let), B_let_def)
+                    A_let_in_B_let = s0_let.right().by(s0_let)
+                    element_in_B = (element @ B).by(A_let_in_B_let, element_is_A_let)
+                    (element @ class_).by(element_in_B, class_is_B_let)
+                s0_imply_s = escape()
+
+                with sentence as s:
+                    def_and_s = ((element_definition & class_definition) & s)
+                    sentence_0.found(def_and_s)
+                s_imply_s0 = escape()
+
+                s_iff_s0 = (s0_imply_s.left() == s0_imply_s.right()).by(s0_imply_s, s_imply_s0)
+                return sentence_0, s_iff_s0, variables
+
+            else:
+                assert False
+
+
+        elif sentence.get_name() == "equal":
+            A = sentence.left()
+            B = sentence.right()
+            extensionality = theorems["axiom_of_extensionality_2"].put(A).put(B)
+
+            x = extensionality.get_all_variables()[0]
+            v = Variable("ST_6_" + str(ST_counter))
+            with All(v, Set(v) >> ((v @ A) == (v @ B))) as va:
+                with Set(x) as xs:
+                    va.bput(x, xs)
+                escape(x)
+            v_to_x = escape()
+            with All(x, Set(x) >> ((x @ A) == (x @ B))) as xa:
+                with Set(v) as vs:
+                    xa.bput(v, vs)
+                escape(v)
+            x_to_v = escape()
+            x_iff_v = (All(v, Set(v) >> ((v @ A) == (v @ B))) == All(x, Set(x) >> ((x @ A) == (x @ B)))).by(v_to_x, x_to_v)
+
+            extensionality = (All(v, Set(v) >> ((v @ A) == (v @ B))) == (A == B)).by(extensionality, x_iff_v)
+
+            sentence_0, equivalence_0, variables = sentence_transformation(extensionality.left(), variables)
+            equivalence_equal = (sentence == sentence_0).by(extensionality, equivalence_0)
+            return sentence_0, equivalence_equal, variables
+        else:
+            definition = get_definition(sentence.get_name())
+            for index in range(0, len(sentence)):
+                definition = definition.put(sentence[index])
+            sentence_0, equivalence_0, variables = sentence_transformation(definition.right(), variables)
+            equivalence_property = (sentence == sentence_0).by(definition, equivalence_0)
+        return sentence_0, equivalence_property, variables
+    elif sentence.is_quantifier():
+        if sentence.get_name() == "all":
+            v = sentence.variable()
+            statement = sentence.statement()
+            
+            At = None
+            with ~Exist(v, ~statement) as nEn:
+                Ann = All(v, ~~statement).by(nEn)
+                t = Variable("ST_7_" + str(ST_counter))
+                At = (statement.substitute(v, t)).by(Ann.put(t)).gen(t)
+            nEn_imply_At = escape()
+
+            with At as At:
+                At.put(v).gen(v)
+            At_to_Av = escape()
+            nEn_imply_A = ((~Exist(v, ~statement)) >> (All(v, statement))).by(At_to_Av, nEn_imply_At)
+
+            with Exist(v, ~statement) as En:
+                with sentence as A:
+                    En_let = En.let("ST_3_" + str(ST_counter))
+                    x = Variable("ST_3_" + str(ST_counter))
+                    A_put = A.put(x)
+                    false.by(A_put, En_let)
+                (~sentence).by(escape())
+            En_imply_nA = escape()        
+
+            A_iff_nEn = (sentence == nEn).by(En_imply_nA, nEn_imply_A)
+
+            sentence_0, equivalence_0, variables = sentence_transformation(nEn, variables)
+            equivalence_all = (sentence == sentence_0).by(equivalence_0, A_iff_nEn)
+
+            return sentence_0, equivalence_all, variables
+
+        elif sentence.get_name() == "exist":
+            v = sentence.variable()
+            statement = sentence.statement()
+
+            if not v in variables:
+                variables.append(v)
+
+            statement_0, _, variables = sentence_transformation(statement, variables)
+            sentence_0 = Exist(v, statement_0)
+
+            with sentence_0 as s0:
+                s0_let = s0.let("ST_1_" + str(ST_counter))
+                x = Variable("ST_1_" + str(ST_counter))
+                s_let = sentence.statement().substitute(v, x)
+                _, equivalence_let, variables = sentence_transformation(s_let, variables)
+                equivalence_let = (s_let == s0_let).by(equivalence_let)
+                s_let = s_let.by(s0_let, equivalence_let)
+                sentence.found(s_let)
+            s0_imply_s = escape()
+
+            with sentence as s:
+                s_let = s.let("ST_0_" + str(ST_counter))
+                x = Variable("ST_0_" + str(ST_counter))
+                s0_let, equivalence_let, variables = sentence_transformation(s_let, variables)
+                s0_let = s0_let.by(s_let, equivalence_let)
+                s0 = Exist(v, s0_let.substitute(x, v)).found(s0_let)
+                assert s0.is_proved()
+                differ_by_quantifiers(sentence_0, s0)
+                sentence_0.by(s0)
+            s_imply_s0 = escape()
+
+            equivelence_exist = (s_imply_s0.left() == s_imply_s0.right()).by(s_imply_s0, s0_imply_s)
+            return sentence_0, equivelence_exist, variables
+
+    else:
+        assert False
+
+
+
+clean()
+from variables import *
+
+sentence, equivalence, variables = sentence_transformation(((Set(x) >> (x @ y)) & (Tuple(z, z) == x)), [x, z])
+print(sentence)
+print(equivalence)
+for variable in variables:
+    print(variable)
 
 
 

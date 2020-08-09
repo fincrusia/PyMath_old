@@ -26,6 +26,7 @@ class Node:
     associatives = {}
 
     definitions = {}
+    function_uniqueness = {}
 
     # basic
     def __init__(self, type_, name, children):
@@ -203,6 +204,13 @@ class Node:
         return len(self.__children)
 
     # queries
+
+    def get_name(self):
+        return self.__name
+
+    def get_type(self):
+        return self.__type
+
     def is_proved(self):
         if self.__branch == None:
             return False
@@ -462,7 +470,9 @@ class Node:
         right = self.substitute(variable, b)
         return (left & right) >> (a == b)
 
+    define_function_counter = 0
     def define_function(self, name):
+        Node.define_function_counter += 1
         assert not name in Node.__names
         assert self.is_proved()
 
@@ -488,8 +498,22 @@ class Node:
         b = right.variable()
         assert left.statement().substitute(a, b).compare(right.statement())
         new_function = Function(name)
-        definition = left.statement().substitute(a, new_function(*arguments))
+        new_term = new_function(*arguments)
+        definition = left.statement().substitute(a, new_term)
+
+        # uniqueness part
+        DF = Variable("DF_" + str(Node.define_function_counter))
+        uniqueness = All(DF, definition.contract(new_term, DF) >> (DF == new_term))
         
+        for index in reversed(range(0, len(arguments))):
+            if bounds[index] == NoneNode("DF"):
+                uniqueness = All(arguments[index], uniqueness)
+            else:
+                uniqueness = All(arguments[index], bounds[index] >> uniqueness)
+        uniqueness.__prove()
+
+        Node.function_uniqueness[name] = uniqueness
+
         for index in reversed(range(0, len(arguments))):
             if bounds[index] == NoneNode("DF"):
                 definition = All(arguments[index], definition)
@@ -497,6 +521,7 @@ class Node:
                 definition = All(arguments[index], bounds[index] >> definition)
         definition.__prove()
         Node.definitions[name] = definition
+
         return definition
 
     __let_counter = 0
@@ -596,12 +621,34 @@ class Node:
         self.__prove()
         return self
 
+    def not_exist_to_all_not(self):
+        assert self.is_proved()
+        assert self.is_logical() and self.__name == "not"
+        cursor = self.body()
+        assert cursor.is_quantifier() and cursor.__name == "exist"
+        variable = cursor.variable()
+        cursor = cursor.statement()
+        all_not = All(variable, ~cursor)
+        all_not.__prove()
+        return all_not
+
+    def not_all_exist_not(self):
+        assert self.is_proved()
+        assert self.is_logical() and self.__name == "not"
+        cursor = self.body()
+        assert cursor.is_quantifier() and cursor.__name == "all"
+        variable = cursor.variable()
+        cursor = cursor.statement()
+        exist_not = Exist(variable, ~cursor)
+        exist_not.__prove()
+        return exist_not
+
     __marked_indexes = set()
     choices = {}
     def by(self, *reasons):
         form = str(self)
         for reason in reasons:
-            form += ("\\" + str(reason))
+            form += ("\\\\" + str(reason))
         if Node.choices.get(form):
             try:
                 index, permute = Node.choices[form]
@@ -637,16 +684,7 @@ class Node:
         self.__prove()
         return self
 
-
-
-# load theorems
-theorems_file_name = "theorems.pickle"
 theorems = {}
-try:
-    with open(theorems_file_name, "rb") as fp:
-        theorems = pickle.load(fp)
-except:
-    theorems = {}
 
 # load choices
 choices_file_name = "choices.pickle"
@@ -657,8 +695,6 @@ except:
     Node.choices = {}
 
 def dump():
-    with open(theorems_file_name, "wb") as fp:
-        pickle.dump(theorems, fp)
     with open(choices_file_name, "wb") as fp:
         pickle.dump(Node.choices, fp)
 
@@ -729,3 +765,10 @@ def composite_function(name, term, *arguments):
         uniquely_exist = uniquely_exist.gen(argument)
     definition = uniquely_exist.define_function(name)
     return definition
+
+def get_definition(name):
+    return Node.definitions[name]
+
+def get_uniqueness(name):
+    return Node.function_uniqueness[name]
+
