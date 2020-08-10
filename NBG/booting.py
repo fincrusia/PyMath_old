@@ -175,134 +175,6 @@ def uniqueness_from_extensionality(target):
 remember(uniqueness_from_extensionality)
 
 
-# axiom of pairing
-clean()
-from variables import *
-
-axiom_of_pairing = All(x, Set(x) >> All(y, Set(y) >> Exist(p, Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))))
-axiom_of_pairing.axiom().export("axiom_of_pairing")
-
-def Anywhere(*arguments):
-    return Node("function", "anywhere", arguments)
-
-p_def = ((Set(x) & Set(y)) >> (Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))) & (~(Set(x) & Set(y)) >> (p == Anywhere(x, y)))
-with Set(x) as xs:
-    with Set(y) as ys:
-        aop = theorems["axiom_of_pairing"].bput(x, xs).bput(y, ys)
-        aop_let = aop.let("pairing_definition_temporary")
-        let_var = Variable("pairing_definition_temporary")
-        aop_let = p_def.substitute(p, let_var).by(xs, ys, aop_let)
-        Exist(p, p_def).found(aop_let)
-    escape()
-xys_case = escape()
-
-with ~(Set(x) & Set(y)) as nxys:
-    p_is_p = (Anywhere(x, y) == Anywhere(x, y)).by()
-    p_def_0 = (((Set(x) & Set(y)) >> (Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))) & (~(Set(x) & Set(y)) >> (Anywhere(x, y) == Anywhere(x, y)))).by(p_is_p, nxys)
-    Exist(p, p_def).found(p_def_0)
-nxys_case = escape()
-
-existence = Exist(p, p_def).by(xys_case, nxys_case)
-a_def = p_def.substitute(p, a)
-b_def = p_def.substitute(p, b)
-
-with a_def as a_def:
-    with b_def as b_def:
-        with (Set(x) & Set(y)) as xys:
-            a_def_left = a_def.left().right().right().by(xys, a_def)
-            b_def_left = b_def.left().right().right().by(xys, b_def)
-            with Set(z) as zs:
-                a_def_left = a_def_left.bput(z, zs)
-                b_def_left = b_def_left.bput(z, zs)
-                za_iff_zb = ((z @ a) == (z @ b)).by(a_def_left, b_def_left)
-            za_iff_zb = escape(z)
-            extensionality = theorems["axiom_of_extensionality"].put(a).put(b)
-            x0 = extensionality.get_all_variables()[0]
-            x0a_iff_x0b = za_iff_zb.put(x0).gen(x0)
-            a_is_b = (a == b).by(x0a_iff_x0b, extensionality)
-        xys_case = escape()
-        with ~(Set(x) & Set(y)) as nxys:
-            a_is_any = (a == Anywhere(x, y)).by(a_def, nxys)
-            b_is_any = (b == Anywhere(x, y)).by(b_def, nxys)
-            a_is_b = (a == b).by(a_is_any, b_is_any)
-        nxys_case = escape()
-        a_is_b = (a == b).by(xys_case, nxys_case)
-    escape()
-uniqueness = ((a_def & b_def) >> (a == b)).by(escape()).gen(b).gen(a).assert_unique(c)
-
-uniquely_exist = (uniqueness & existence).by(uniqueness, existence).gen(y).gen(x)
-definition_of_pairing = uniquely_exist.define_function("pairing")
-
-definition_of_pairing = definition_of_pairing.put(x).put(y)
-definition_of_pairing = definition_of_pairing.left().by(definition_of_pairing)
-with Set(x) as xs:
-    with Set(y) as ys:
-        definition_of_pairing = definition_of_pairing.right().by(xs, ys, definition_of_pairing)
-    escape(y)
-definition_of_pairing = escape(x).export("definition_of_pairing")
-
-
-def Pairing(a, b):
-    return Node("function", "pairing", [a, b])
-
-binary("pairing", "#")
-
-def pairing_is_set(target, as_, bs):
-    a = as_.body()
-    b = bs.body()
-    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(b, bs)
-    abs_ = Set(Pairing(a, b)).by(definition_of_pairing)
-    return abs_
-
-remember(pairing_is_set)
-
-def property_of_pairing_1(target, x_in_a_pair_b, as_, bs):
-    x = x_in_a_pair_b.left()
-    a = x_in_a_pair_b.right().left()
-    b = x_in_a_pair_b.right().right()
-    xs = Set(x).by(x_in_a_pair_b)
-    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(b, bs)
-    P = definition_of_pairing.right().by(definition_of_pairing).bput(x, xs)
-    P = P.right().by(P, x_in_a_pair_b)
-    return P
-
-remember(property_of_pairing_1)
-
-def property_of_pairing_2(target, as_, bs):
-    a = as_.body()
-    b = bs.body()
-    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(b, bs)
-    definition_of_pairing = definition_of_pairing.right().by(definition_of_pairing).bput(a, as_)
-    result = (a @ Pairing(a, b)).by(definition_of_pairing, (a == a).by())
-    return result
-
-remember(property_of_pairing_2)
-
-def property_of_pairing_3(target, as_, bs):
-    a = as_.body()
-    b = bs.body()
-    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(b, bs)
-    definition_of_pairing = definition_of_pairing.right().by(definition_of_pairing).bput(b, bs)
-    result = (b @ Pairing(a, b)).by(definition_of_pairing, (b == b).by())
-    return result
-
-remember(property_of_pairing_3)
-
-def property_of_pairing_4(target, x_in_uaa, as_):
-    a = as_.body()
-    x = x_in_uaa.left()
-    xs = Set(x).by(x_in_uaa)
-    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(a, as_)
-    definition_of_pairing = definition_of_pairing.right().by(definition_of_pairing).bput(x, xs)
-    x_is_a_or_a = ((x == a) | (x == a)).by(definition_of_pairing, x_in_uaa)
-    x_is_a = (x == a).by(x_is_a_or_a)
-    return x_is_a
-
-remember(property_of_pairing_4)
-
-
-def MembershipClass():
-    return Node("variable", "membership_class", [])
 
 # intersection_function
 clean()
@@ -472,6 +344,133 @@ def is_not_empty(target, x_in_A):
     return result
 
 remember(is_not_empty)
+
+# axiom of pairing
+clean()
+from variables import *
+
+axiom_of_pairing = All(x, Set(x) >> All(y, Set(y) >> Exist(p, Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))))
+axiom_of_pairing.axiom().export("axiom_of_pairing")
+
+def Anywhere(*arguments):
+    return EmptyClass() # convension
+
+p_def = ((Set(x) & Set(y)) >> (Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))) & (~(Set(x) & Set(y)) >> (p == Anywhere(x, y)))
+with Set(x) as xs:
+    with Set(y) as ys:
+        aop = theorems["axiom_of_pairing"].bput(x, xs).bput(y, ys)
+        aop_let = aop.let("pairing_definition_temporary")
+        let_var = Variable("pairing_definition_temporary")
+        aop_let = p_def.substitute(p, let_var).by(xs, ys, aop_let)
+        Exist(p, p_def).found(aop_let)
+    escape()
+xys_case = escape()
+
+with ~(Set(x) & Set(y)) as nxys:
+    p_is_p = (Anywhere(x, y) == Anywhere(x, y)).by()
+    p_def_0 = (((Set(x) & Set(y)) >> (Set(p) & All(z, Set(z) >> ((z @ p) == ((z == x) | (z == y)))))) & (~(Set(x) & Set(y)) >> (Anywhere(x, y) == Anywhere(x, y)))).by(p_is_p, nxys)
+    Exist(p, p_def).found(p_def_0)
+nxys_case = escape()
+
+existence = Exist(p, p_def).by(xys_case, nxys_case)
+a_def = p_def.substitute(p, a)
+b_def = p_def.substitute(p, b)
+
+with a_def as a_def:
+    with b_def as b_def:
+        with (Set(x) & Set(y)) as xys:
+            a_def_left = a_def.left().right().right().by(xys, a_def)
+            b_def_left = b_def.left().right().right().by(xys, b_def)
+            with Set(z) as zs:
+                a_def_left = a_def_left.bput(z, zs)
+                b_def_left = b_def_left.bput(z, zs)
+                za_iff_zb = ((z @ a) == (z @ b)).by(a_def_left, b_def_left)
+            za_iff_zb = escape(z)
+            extensionality = theorems["axiom_of_extensionality"].put(a).put(b)
+            x0 = extensionality.get_all_variables()[0]
+            x0a_iff_x0b = za_iff_zb.put(x0).gen(x0)
+            a_is_b = (a == b).by(x0a_iff_x0b, extensionality)
+        xys_case = escape()
+        with ~(Set(x) & Set(y)) as nxys:
+            a_is_any = (a == Anywhere(x, y)).by(a_def, nxys)
+            b_is_any = (b == Anywhere(x, y)).by(b_def, nxys)
+            a_is_b = (a == b).by(a_is_any, b_is_any)
+        nxys_case = escape()
+        a_is_b = (a == b).by(xys_case, nxys_case)
+    escape()
+uniqueness = ((a_def & b_def) >> (a == b)).by(escape()).gen(b).gen(a).assert_unique(c)
+
+uniquely_exist = (uniqueness & existence).by(uniqueness, existence).gen(y).gen(x)
+definition_of_pairing = uniquely_exist.define_function("pairing")
+
+definition_of_pairing = definition_of_pairing.put(x).put(y)
+definition_of_pairing = definition_of_pairing.left().by(definition_of_pairing)
+with Set(x) as xs:
+    with Set(y) as ys:
+        definition_of_pairing = definition_of_pairing.right().by(xs, ys, definition_of_pairing)
+    escape(y)
+definition_of_pairing = escape(x).export("definition_of_pairing")
+
+
+def Pairing(a, b):
+    return Node("function", "pairing", [a, b])
+
+binary("pairing", "#")
+
+def pairing_is_set(target, as_, bs):
+    a = as_.body()
+    b = bs.body()
+    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(b, bs)
+    abs_ = Set(Pairing(a, b)).by(definition_of_pairing)
+    return abs_
+
+remember(pairing_is_set)
+
+def property_of_pairing_1(target, x_in_a_pair_b, as_, bs):
+    x = x_in_a_pair_b.left()
+    a = x_in_a_pair_b.right().left()
+    b = x_in_a_pair_b.right().right()
+    xs = Set(x).by(x_in_a_pair_b)
+    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(b, bs)
+    P = definition_of_pairing.right().by(definition_of_pairing).bput(x, xs)
+    P = P.right().by(P, x_in_a_pair_b)
+    return P
+
+remember(property_of_pairing_1)
+
+def property_of_pairing_2(target, as_, bs):
+    a = as_.body()
+    b = bs.body()
+    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(b, bs)
+    definition_of_pairing = definition_of_pairing.right().by(definition_of_pairing).bput(a, as_)
+    result = (a @ Pairing(a, b)).by(definition_of_pairing, (a == a).by())
+    return result
+
+remember(property_of_pairing_2)
+
+def property_of_pairing_3(target, as_, bs):
+    a = as_.body()
+    b = bs.body()
+    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(b, bs)
+    definition_of_pairing = definition_of_pairing.right().by(definition_of_pairing).bput(b, bs)
+    result = (b @ Pairing(a, b)).by(definition_of_pairing, (b == b).by())
+    return result
+
+remember(property_of_pairing_3)
+
+def property_of_pairing_4(target, x_in_uaa, as_):
+    a = as_.body()
+    x = x_in_uaa.left()
+    xs = Set(x).by(x_in_uaa)
+    definition_of_pairing = theorems["definition_of_pairing"].bput(a, as_).bput(a, as_)
+    definition_of_pairing = definition_of_pairing.right().by(definition_of_pairing).bput(x, xs)
+    x_is_a_or_a = ((x == a) | (x == a)).by(definition_of_pairing, x_in_uaa)
+    x_is_a = (x == a).by(x_is_a_or_a)
+    return x_is_a
+
+remember(property_of_pairing_4)
+
+
 
 
 # ordered_pair
@@ -704,6 +703,11 @@ clean()
 from variables import *
 
 Exist(E, All(x, Set(x) >> All(y, Set(y) >> ((Tuple(x, y) @ E) == (x @ y))))).axiom().export("axiom_of_membership")
+
+
+
+def MembershipClass():
+    return Node("variable", "membership_class", [])
 
 
 # axiom of domain
@@ -1351,13 +1355,13 @@ def sentence_transformation(sentence, variables):
         elif sentence.get_name() == "or":
             sentence_0, equivalence_0, variables = sentence_transformation(sentence.left(), variables)
             sentence_1, equivalence_1, variables = sentence_transformation(sentence.right(), variables)
-            sentence_or = ~(~sentence_0 | sentence_1)
+            sentence_or = ~((~sentence_0) & (~sentence_1))
             equivalence_or = (sentence == sentence_or).by(equivalence_0, equivalence_1)
             return sentence_or, equivalence_or, variables
         elif sentence.get_name() == "imply":
             sentence_0, equivalence_0, variables = sentence_transformation(sentence.left(), variables)
             sentence_1, equivalence_1, variables = sentence_transformation(sentence.right(), variables)
-            sentence_imply = (~sentence_0) | sentence_1
+            sentence_imply = ~(sentence_0 & ~sentence_1)
             equivalence_imply = (sentence == sentence_imply).by(equivalence_0, equivalence_1)
             return sentence_imply, equivalence_imply, variables
         elif sentence.get_name() == "iff":
@@ -1380,10 +1384,10 @@ def sentence_transformation(sentence, variables):
             element = sentence.left()
             class_ = sentence.right()
 
-            if (element.is_variable() or element.get_name() == "anywhere") and (class_.is_variable() or class_.get_name() == "anywhere"):
+            if element.is_variable() and class_.is_variable():
                 return sentence, (sentence == sentence).by(), variables
 
-            elif (element.is_function() and element.get_name() != "anywhere") and (class_.is_variable() or class_.get_name() == "anywhere"):
+            elif element.is_function() and class_.is_variable():
                 A = Variable("ST_4_" + str(ST_counter))
                 element_definition = get_definition(element.get_name())
                 for index in range(0, len(element)):
@@ -1408,16 +1412,17 @@ def sentence_transformation(sentence, variables):
                 s_imply_s0 = escape()
                 
                 s_iff_s0 = (s0_imply_s.left() == s0_imply_s.right()).by(s0_imply_s, s_imply_s0)
-                return sentence_0, s_iff_s0, variables
+                sentence_1, equivalence_1, variables = sentence_transformation(sentence_0, variables)
+                s_iff_s1 = (sentence == sentence_1).by(equivalence_1, s_iff_s0)
+                return sentence_1, s_iff_s1, variables
 
-            elif (element.is_variable() or element.get_name() == "anywhere") and (class_.is_function() and class_.get_name() != "anywhere"):
+            elif element.is_variable() and class_.is_function():
                 B = Variable("ST_5_" + str(ST_counter))
 
                 class_definition = get_definition(class_.get_name())
                 for index in range(0, len(class_)):
                     class_definition = class_definition.put(class_[index])
                 sentence_0 = Exist(B, class_definition.contract(class_, B) & (element @ B))
-
 
                 class_uniqueness = get_uniqueness(class_.get_name())
                 for index in range(0, len(class_)):
@@ -1437,7 +1442,9 @@ def sentence_transformation(sentence, variables):
                 s_imply_s0 = escape()
 
                 s_iff_s0 = (s0_imply_s.left() == s0_imply_s.right()).by(s0_imply_s, s_imply_s0)
-                return sentence_0, s_iff_s0, variables
+                sentence_1, equivalence_1, variables = sentence_transformation(sentence_0, variables)
+                s_iff_s1 = (sentence == sentence_1).by(equivalence_1, s_iff_s0)
+                return sentence_1, s_iff_s1, variables
 
             else:
                 A = Variable("ST_4_" + str(ST_counter))
@@ -1478,7 +1485,10 @@ def sentence_transformation(sentence, variables):
                 s_imply_s0 = escape()
 
                 s_iff_s0 = (s0_imply_s.left() == s0_imply_s.right()).by(s0_imply_s, s_imply_s0)
-                return sentence_0, s_iff_s0, variables
+                sentence_1, equivalence_1, variables = sentence_transformation(sentence_0, variables)
+                s_iff_s1 = (sentence == sentence_1).by(equivalence_1, s_iff_s0)
+                return sentence_1, s_iff_s1, variables
+
 
 
 
@@ -1582,4 +1592,10 @@ def sentence_transformation(sentence, variables):
 
     else:
         assert False
+
+
+clean()
+from variables import *
+
+print(sentence_transformation(All(z, Set(z) & (z == Pairing(x, y))), [x, y])[0])
 
